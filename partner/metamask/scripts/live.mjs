@@ -1,5 +1,5 @@
-// Live testnet runner. NOT run by CI or by the author: it exists so the owner can run
-// the demo for real after approving the transactions listed by `plan`.
+// Live testnet runner. CI never runs it. It sends real transactions only with --broadcast, after the
+// owner approves the list printed by `plan`. It was run once on 2026-11-16; see live-result.json.
 //
 //   node scripts/live.mjs plan                      # prints the tx list; no keys, no network writes
 //   node scripts/live.mjs grant  --broadcast        # tx A (deploy smart account) + tx B (fund it) + signs the delegation
