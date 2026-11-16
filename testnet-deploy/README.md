@@ -5,7 +5,9 @@ The page in this folder has two parts:
 1. **View the live verdict (default, no wallet).** On load it creates a read-only `genlayer-js` client (no account, no provider) for **GenLayer Testnet Bradbury (Phase 2)** and calls the contract's read-only views `get_status`, `get_verdict`, and `get_case` on the deployed sample case, [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B). It renders the mandate, deliverable, verdict, reasoning, supporting quote, and explorer links. No transaction is sent and MetaMask is not needed.
 2. **Try it with MetaMask (optional, collapsed).** Deploys `contracts/MandateVerdict.py` from the visitor's own wallet and runs one verdict. Every transaction is signed in the browser with MetaMask through `window.ethereum`. These are real Bradbury testnet transactions. The page never sees or asks for a seed phrase or private key.
 
-Hosted at **https://pz-human-owner.github.io/internet-court-mandate-demo/** once GitHub Pages is enabled for the repository (Settings → Pages → Source: GitHub Actions). The workflow [`../.github/workflows/pages.yml`](../.github/workflows/pages.yml) then runs `npm ci`, `npm test`, and `npm run build` here on every push to `main` and publishes `dist/`. Until Pages is enabled, run it locally (below).
+Hosted at **https://pz-human-owner.github.io/internet-court-mandate-demo/**. The workflow [`../.github/workflows/pages.yml`](../.github/workflows/pages.yml) runs `npm ci`, `npm test`, and `npm run build` here on every push to `main` and publishes `dist/`. You can also run it locally (below).
+
+MetaMask's role here is limited: the jury reads MetaMask's official delegation docs as evidence, and MetaMask is the optional signer for the deploy section. The page does not use the MetaMask Smart Accounts Kit or ERC-7710 in code.
 
 ### View mode details
 
