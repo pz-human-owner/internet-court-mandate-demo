@@ -19,7 +19,7 @@ import { createPublicClient, createWalletClient, http, parseEther, formatEther, 
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { Implementation, toMetaMaskSmartAccount, getSmartAccountsEnvironment } from '@metamask/smart-accounts-kit';
-import { buildEscrowDelegation, settle, hashDelegation, SAMPLE_CASE } from '../src/court-escrow.mjs';
+import { buildPaymentDelegation, settle, hashDelegation, SAMPLE_CASE } from '../src/verdict-payment.mjs';
 import { makeVerdictReader } from '../src/genlayer-verdict.mjs';
 
 const cmd = process.argv[2];
@@ -36,7 +36,7 @@ if (cmd === 'plan' || !cmd) {
 Verdict source: GenLayer Bradbury (chain 4221) MandateVerdict ${caseContract}, read-only gen_call get_verdict
 Accounts: OWNER (signs only, 0 ETH), CLERK (pays all gas), AGENT (receive-only address)
   A  CLERK -> SimpleFactory ${environment.SimpleFactory}: deploy principal Hybrid smart account   ~826k gas
-  B  CLERK -> principal smart account: send ${formatEther(fee)} ETH (the escrowed fee)          ~22-30k gas
+  B  CLERK -> principal smart account: send ${formatEther(fee)} ETH (the agent's fee; stays in the principal's account until redeemed)          ~22-30k gas
   -  OWNER signs the ERC-7710 delegation off-chain (EIP-712, no tx)
   C  CLERK -> DelegationManager.redeemDelegations: pays AGENT ${formatEther(fee)} ETH, only if verdict TRUE   ~630k gas
 Funding: CLERK needs about 0.02 Sepolia ETH (1.5M gas at <=10 gwei, plus the ${formatEther(fee)} fee).`);
@@ -69,14 +69,14 @@ if (cmd === 'grant') {
   const hashB = await clerkWallet.sendTransaction({ to: principal.address, value: fee });
   console.log('B fund smart account', hashB, (await publicClient.waitForTransactionReceipt({ hash: hashB })).status);
   const expiresAt = Math.floor(Date.now() / 1000) + Number(env.EXPIRY_DAYS ?? 7) * 86400;
-  const delegation = buildEscrowDelegation({ environment, principal: principal.address, clerk: clerk.address, agent, amountWei: fee, expiresAt, caseContract });
+  const delegation = buildPaymentDelegation({ environment, principal: principal.address, clerk: clerk.address, agent, amountWei: fee, expiresAt, caseContract });
   const signed = { ...delegation, signature: await principal.signDelegation({ delegation }) };
   writeFileSync(STATE, bigintJson({ chainId: sepolia.id, caseContract, agent, fee, expiresAt, delegationHash: hashDelegation(signed), signed }));
   console.log('Signed delegation', hashDelegation(signed), '-> signed-delegation.json (public data, no keys)');
 } else if (cmd === 'settle') {
   const s = JSON.parse(readFileSync(STATE, 'utf8'));
   const r = await settle({
-    signedDelegation: s.signed, environment, agent: s.agent, amountWei: BigInt(s.fee), expiresAt: s.expiresAt, caseContract: s.caseContract,
+    signedDelegation: s.signed, environment, agent: s.agent, amountWei: BigInt(s.fee), caseContract: s.caseContract,
     readVerdict: makeVerdictReader(s.caseContract),
     sendTransaction: ({ to, data }) => clerkWallet.sendTransaction({ to, data }),
   });

@@ -7,7 +7,7 @@ A principal writes a mandate, binds the evidence a jury may read, and appoints a
 
 The sample case binds official [MetaMask Smart Accounts Kit: Delegation](https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/) documentation (HTTP 200, no redirect, checked 15 November 2026). The mandate asks for a short briefing that mentions ERC-7710, explains that the delegator configures a scope and optional caveats, and never claims that the delegate holds the delegator's private key.
 
-**How MetaMask fits in, plainly:** two ways. (1) The jury reads MetaMask's official delegation documentation as its evidence, and MetaMask is the optional browser signer if you deploy your own copy of the contract. (2) [`partner/metamask/`](partner/metamask/) settles the case with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/): the principal's MetaMask smart account signs an ERC-7710 delegation that can pay the agent a fixed fee once, and a settlement script redeems it only after the GenLayer contract returns TRUE. The delegation's limits are enforced on-chain by MetaMask's Delegation Framework; the verdict check is done by that script, not by a contract (see [MetaMask delegation settlement](#metamask-delegation-settlement)). That flow has run live on Ethereum Sepolia against the real Bradbury verdict: the [redeem transaction](https://sepolia.etherscan.io/tx/0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f) paid the agent 0.001 ETH. MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project is not endorsed by MetaMask.
+**How MetaMask fits in, plainly:** two ways. (1) The jury reads MetaMask's official delegation documentation as its evidence, and MetaMask is the optional browser signer if you deploy your own copy of the contract. (2) [`partner/metamask/`](partner/metamask/) settles the case with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/): the principal's MetaMask smart account signs an ERC-7710 delegation that can pay the agent a fixed fee once, and a settlement script redeems it only after the GenLayer contract returns TRUE. The delegation's limits are enforced on-chain by MetaMask's Delegation Framework; the verdict check and the case match are done by that script, not by a contract, and the fee is not locked in escrow (see [MetaMask delegation settlement](#metamask-delegation-settlement)). That flow has run live on Ethereum Sepolia against the real Bradbury verdict: the [redeem transaction](https://sepolia.etherscan.io/tx/0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f) paid the agent 0.001 ETH. MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project is not endorsed by MetaMask.
 
 ## Live demo
 
@@ -64,16 +64,27 @@ These rules are in `contracts/MandateVerdict.py` (`_normalize_ws`, `_quote_in_pa
 
 [`partner/metamask/`](partner/metamask/) turns the verdict into a payment decision with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/) (`@metamask/smart-accounts-kit` 2.0.0, [delegation guide](https://docs.metamask.io/smart-accounts-kit/guides/delegation/execute-on-smart-accounts-behalf/)).
 
-1. **Escrow.** The principal has a MetaMask Hybrid smart account on Ethereum Sepolia holding the agent's fee (0.001 ETH in the demo).
-2. **Grant.** The principal signs one ERC-7710 delegation (EIP-712, off-chain) to a settlement account, the *clerk*. Its salt is derived from the GenLayer case (chain 4221 + the MandateVerdict address), so the delegation names the case it settles. Its caveats are checked on-chain by MetaMask's Delegation Framework at redemption:
+1. **Fund.** The principal has a MetaMask Hybrid smart account on Ethereum Sepolia holding the agent's fee (0.001 ETH in the demo). This is not an escrow: the fee stays in the principal's own account, and the owner could move it out before redemption, in which case the redemption reverts and the agent is not paid.
+2. **Grant.** The principal signs one ERC-7710 delegation (EIP-712, off-chain) to a settlement account, the *clerk*. These caveats are checked on-chain by MetaMask's Delegation Framework at redemption:
    - [`nativeTokenTransferAmount`](https://docs.metamask.io/smart-accounts-kit/guides/delegation/use-delegation-scopes/spending-limit/) scope: at most the fee, in total
    - [`exactExecution`](https://docs.metamask.io/smart-accounts-kit/reference/delegation/caveats/): the only allowed call is "send exactly the fee to the agent"
    - `redeemer`: only the clerk may redeem
    - `limitedCalls`: once
-   - `timestamp`: only before the expiry (7 days by default)
+   - `timestamp`: only before the expiry. The live runner sets 7 days by default (`EXPIRY_DAYS`); the delegation builder accepts any expiry and doesn't enforce a length.
+
+   **Case label, checked off-chain only:** the delegation's salt is derived from the GenLayer case (chain 4221 + the MandateVerdict address). It changes the delegation hash, so the signed delegation names its case, but no caveat checks it. Only the clerk's `settle()` code refuses a delegation whose salt doesn't match the case it's settling.
 3. **Settle.** The clerk reads `get_verdict` from the Bradbury contract (read-only `gen_call`). Resolved **TRUE**: it calls `DelegationManager.redeemDelegations` and the agent is paid. **FALSE** or **UNDETERMINED**: it refuses, and the delegation lapses at expiry. The principal can also revoke it early with [`disableDelegation`](https://docs.metamask.io/smart-accounts-kit/guides/delegation/disable-delegation/); the calldata is built in the code, but sending it needs a bundler and is not wired up. Not resolved yet: it waits.
 
-**What is enforced where.** GenLayer and Sepolia are separate chains with no oracle between them, so the verdict gate is the clerk's code, and the clerk is a trusted party. On-chain enforcement covers everything else: nobody but the clerk can redeem, nobody can redeem more than once or after expiry, and the only possible payment is the exact fee to the named agent. A dishonest clerk could pay the agent on a FALSE verdict. It could not pay anyone else, pay more, or pay twice.
+**What is enforced where.** GenLayer and Sepolia are separate chains with no oracle between them. Two things are left to the clerk's code, so the clerk is a trusted party:
+- reading and honoring the verdict
+- matching the delegation to its case (the salt check)
+
+MetaMask's caveat enforcers check these on-chain:
+- only the clerk can redeem
+- it can redeem only once, and only before the expiry
+- the only possible payment is the exact fee to the named agent
+
+The chain doesn't guarantee that the fee is still there; see step 1. A dishonest clerk could pay the agent on a FALSE verdict, or for the wrong case. It could not pay anyone else, pay more, or pay twice.
 
 **What has been run.** `npm run simulate` starts a local [anvil](https://book.getfoundry.sh/anvil/) fork of Ethereum Sepolia, which includes MetaMask's deployed DelegationManager and enforcers. It uses throwaway keys that live only in memory and broadcasts nothing to any public network. Then it:
 - deploys the principal's smart account through `SimpleFactory`
@@ -87,7 +98,7 @@ The recorded output is in [`partner/metamask/sim-result.json`](partner/metamask/
 
 ### Live run on Sepolia
 
-On 16 November 2026 (20:38–20:39 UTC) the flow ran on public Ethereum Sepolia with throwaway testnet keys. The clerk read the real Bradbury verdict for [`0x07E2…2F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B), got `resolved` / **TRUE**, and redeemed the delegation. The full record, with hashes, blocks, addresses, the delegation hash and caveat enforcers, is in [`partner/metamask/live-result.json`](partner/metamask/live-result.json).
+On 16 November 2026 (20:38–20:39 UTC) the flow ran on public Ethereum Sepolia with throwaway testnet keys. The clerk read the real Bradbury verdict for [`0x07E2…2F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B), got `resolved` / **TRUE**, and redeemed the delegation. All keys were throwaway testnet keys. To keep the demo to one funded account, the clerk paid the gas for all three transactions and also sent the 0.001 ETH fee into the principal's smart account (step B). In real use the principal would fund their own account. The full record, with hashes, blocks, addresses, the delegation hash and caveat enforcers, is in [`partner/metamask/live-result.json`](partner/metamask/live-result.json).
 
 | Step | Transaction | Block | Result |
 |---|---|---|---|
@@ -151,7 +162,7 @@ MetaMask delegation (Node 20+). The unit tests are network-free. The simulation 
 ```bash
 cd partner/metamask
 npm ci
-npm test          # delegation shape, caveats, salt binding, signature recovery, settle() decisions
+npm test          # delegation shape, caveats, salt label, expiry read from the signed caveat, signature recovery, settle() decisions
 npm run simulate  # local anvil fork of Sepolia: deploy, fund, sign, read the live verdict, redeem
 npm run plan      # prints the three public-testnet transactions a live run would send
 ```
@@ -195,7 +206,7 @@ Each transaction sends a fee deposit as `value`; unused budget is refunded at fi
 ## Limitations
 
 - **One case per contract.** A registry of many mandates would be a later revision.
-- **The settlement clerk is trusted.** `partner/metamask/` gates the MetaMask delegation on the verdict in off-chain code. MetaMask's caveat enforcers limit what the clerk can do (exact fee, to the named agent, once, before expiry), but no contract checks the GenLayer verdict on Sepolia. A trustless version would need an oracle or a bridge that carries the verdict to the EVM chain, plus a caveat enforcer that reads it.
+- **The settlement clerk is trusted.** `partner/metamask/` gates the MetaMask delegation on the verdict in off-chain code. MetaMask's caveat enforcers limit what the clerk can do (exact fee, to the named agent, once, before expiry), but no contract checks the GenLayer verdict or the case label (salt) on Sepolia, and the fee is not locked: it stays in the principal's own account until redemption. A trustless version would need an oracle or a bridge that carries the verdict to the EVM chain, plus a caveat enforcer that reads it.
 - **Local tests use a v0.3-dev stand-in.** `tests/direct` runs the contract in genlayer-test's in-memory VM with mocked web and model responses. That environment is a v0.3-dev stand-in, not the exact Bradbury runner pinned in the contract header, and it is not a network consensus run. The on-chain proof above is the authoritative result.
 - **Submitted-URL binding is not the fetched page.** GenVM follows redirects and does not expose the final URL, so a bound URL can still lead the jury to a page the agent controls if that page is the redirect target. With prefix binding, the agent can also submit any path under the allowed prefix, including a page it controls there. See [Evidence-URL policy](#evidence-url-policy).
 - **Quote matching is normalized, and the model sees a truncated page.** See [Quote matching and page window](#quote-matching-and-page-window).

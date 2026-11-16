@@ -11,7 +11,7 @@ import { createPublicClient, createTestClient, createWalletClient, http, parseEt
 import { sepolia } from 'viem/chains';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { Implementation, toMetaMaskSmartAccount, getSmartAccountsEnvironment } from '@metamask/smart-accounts-kit';
-import { buildEscrowDelegation, settle, redeemCalldata, hashDelegation, SAMPLE_CASE } from '../src/court-escrow.mjs';
+import { buildPaymentDelegation, settle, redeemCalldata, hashDelegation, SAMPLE_CASE } from '../src/verdict-payment.mjs';
 import { makeVerdictReader } from '../src/genlayer-verdict.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
@@ -62,15 +62,15 @@ let h = await clerkWallet.sendTransaction({ to: factory, data: factoryData });
 let rc = await publicClient.waitForTransactionReceipt({ hash: h });
 step('A deploy principal smart account (fork)', { smartAccount: principal.address, status: rc.status, gasUsed: rc.gasUsed });
 
-// Tx B: fund the principal smart account with the escrowed fee.
+// Tx B: fund the principal smart account with the agent's fee (not locked; the owner could move it).
 h = await clerkWallet.sendTransaction({ to: principal.address, value: AMOUNT });
 rc = await publicClient.waitForTransactionReceipt({ hash: h });
 step('B fund principal smart account (fork)', { value: formatEther(AMOUNT), status: rc.status });
 
-// Off-chain: principal signs the court-escrow delegation (EIP-712 signature, no tx).
+// Off-chain: principal signs the payment delegation (EIP-712 signature, no tx).
 const latest = await publicClient.getBlock();
 const expiresAt = Number(latest.timestamp) + 7 * 86400;
-const delegation = buildEscrowDelegation({ environment, principal: principal.address, clerk: clerk.address, agent, amountWei: AMOUNT, expiresAt, caseContract: SAMPLE_CASE });
+const delegation = buildPaymentDelegation({ environment, principal: principal.address, clerk: clerk.address, agent, amountWei: AMOUNT, expiresAt, caseContract: SAMPLE_CASE });
 const signed = { ...delegation, signature: await principal.signDelegation({ delegation }) };
 step('sign delegation (off-chain)', { delegationHash: hashDelegation(signed), caveats: signed.caveats.length, salt: signed.salt });
 
@@ -82,7 +82,7 @@ try {
 } catch (e) { if (/unexpectedly/.test(e.message)) throw e; step('outsider redemption rejected', { reason: e.shortMessage ?? e.message.split('\n')[0] }); }
 
 // FALSE path: same delegation, mocked FALSE verdict -> clerk refuses, nothing sent.
-const refused = await settle({ signedDelegation: signed, environment, agent, amountWei: AMOUNT, expiresAt, caseContract: SAMPLE_CASE,
+const refused = await settle({ signedDelegation: signed, environment, agent, amountWei: AMOUNT, caseContract: SAMPLE_CASE,
   readVerdict: async () => JSON.stringify({ status: 'resolved', verdict: 'FALSE' }), sendTransaction: async () => { throw new Error('must not send on FALSE'); }, nowSec: Number(latest.timestamp) });
 step('settle with mocked FALSE verdict', { action: refused.action, why: refused.why });
 
@@ -90,7 +90,7 @@ step('settle with mocked FALSE verdict', { action: refused.action, why: refused.
 const verdictJson = arg('--verdict-json');
 const readVerdict = verdictJson ? async () => verdictJson : makeVerdictReader(SAMPLE_CASE);
 const before = await publicClient.getBalance({ address: agent });
-const res = await settle({ signedDelegation: signed, environment, agent, amountWei: AMOUNT, expiresAt, caseContract: SAMPLE_CASE, readVerdict, nowSec: Number(latest.timestamp),
+const res = await settle({ signedDelegation: signed, environment, agent, amountWei: AMOUNT, caseContract: SAMPLE_CASE, readVerdict, nowSec: Number(latest.timestamp),
   sendTransaction: ({ to, data }) => clerkWallet.sendTransaction({ to, data }) });
 let redeemReceipt;
 if (res.txHash) redeemReceipt = await publicClient.waitForTransactionReceipt({ hash: res.txHash });
@@ -106,7 +106,7 @@ try {
 } catch (e) { if (/unexpectedly/.test(e.message)) throw e; step('second redemption rejected', { reason: e.shortMessage ?? e.message.split('\n')[0] }); }
 
 // Negative 3: a fresh delegation stops working after its timestamp window (fork time warp).
-const d2 = buildEscrowDelegation({ environment, principal: principal.address, clerk: clerk.address, agent, amountWei: AMOUNT, expiresAt: Number(latest.timestamp) + 3600, caseContract: SAMPLE_CASE });
+const d2 = buildPaymentDelegation({ environment, principal: principal.address, clerk: clerk.address, agent, amountWei: AMOUNT, expiresAt: Number(latest.timestamp) + 3600, caseContract: SAMPLE_CASE });
 const s2 = { ...d2, signature: await principal.signDelegation({ delegation: d2 }) };
 await clerkWallet.sendTransaction({ to: principal.address, value: AMOUNT }).then((hash) => publicClient.waitForTransactionReceipt({ hash }));
 await testClient.increaseTime({ seconds: 7200 });

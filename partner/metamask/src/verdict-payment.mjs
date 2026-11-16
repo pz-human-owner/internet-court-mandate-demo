@@ -1,19 +1,25 @@
-// Verdict-gated MetaMask delegation ("court escrow").
+// Verdict-gated MetaMask delegation payment.
 //
 // The principal's MetaMask smart account (Hybrid DeleGator) signs one ERC-7710
-// delegation to a settlement account (the "clerk"). The delegation's caveats are
-// enforced on-chain by MetaMask's Delegation Framework:
+// delegation to a settlement account (the "clerk"). These caveats are enforced
+// on-chain by MetaMask's Delegation Framework when the delegation is redeemed:
 //   - nativeTokenTransferAmount scope: at most `amountWei` of native token in total
 //   - exactExecution: the only allowed call is "send exactly amountWei to the agent"
 //   - redeemer: only the clerk address may redeem
 //   - limitedCalls: redeemable once
-//   - timestamp: redeemable only before `expiresAt`
-// The delegation salt is derived from the GenLayer case (chain id + MandateVerdict
-// address), so the signed delegation names the case it settles.
+//   - timestamp: redeemable only before `expiresAt` (the caller picks it; the live
+//     runner defaults to 7 days, and this builder does not enforce any length)
 //
-// The verdict gate itself is NOT on-chain: GenLayer Bradbury and the EVM testnet are
-// different chains and no oracle bridges them. The clerk reads the verdict from the
-// GenLayer contract (read-only gen_call) and redeems only on a final TRUE.
+// NOT enforced on-chain, only by the clerk's code in settle():
+//   - the case binding: the salt is derived from the GenLayer case (chain id +
+//     MandateVerdict address). It labels the delegation (it changes the hash), and
+//     settle() refuses a mismatched salt, but no caveat checks it.
+//   - the verdict gate: GenLayer Bradbury and the EVM testnet are separate chains with
+//     no oracle between them. The clerk reads the verdict (read-only gen_call) and
+//     redeems only on a resolved TRUE.
+//
+// This is not an escrow. The fee stays in the principal's own smart account, and the
+// owner can move it out before redemption, in which case the redemption reverts.
 import {
   createDelegation,
   createExecution,
@@ -65,8 +71,8 @@ export function paymentExecution({ agent, amountWei }) {
   return createExecution({ target: getAddress(agent), value: BigInt(amountWei), callData: '0x' });
 }
 
-/** Build (unsigned) the court-escrow delegation. */
-export function buildEscrowDelegation({ environment, principal, clerk, agent, amountWei, expiresAt, caseContract, genlayerChainId }) {
+/** Build (unsigned) the verdict-gated payment delegation. */
+export function buildPaymentDelegation({ environment, principal, clerk, agent, amountWei, expiresAt, caseContract, genlayerChainId }) {
   if (!environment?.DelegationManager) throw new Error('environment is required (getSmartAccountsEnvironment(chainId))');
   if (!(BigInt(amountWei) > 0n)) throw new Error('amountWei must be > 0');
   if (!Number.isInteger(expiresAt) || expiresAt <= 0) throw new Error('expiresAt (unix seconds) is required');
@@ -104,12 +110,28 @@ export function disableCalldata(delegation) {
 export { hashDelegation };
 
 /**
+ * Read the expiry (beforeThreshold, unix seconds) from the delegation's own Timestamp
+ * caveat. TimestampEnforcer terms are 32 bytes: uint128 afterThreshold ++ uint128 beforeThreshold.
+ * Returns null if the delegation has no Timestamp caveat or no upper bound.
+ */
+export function delegationExpiry(delegation, environment) {
+  const enforcer = environment?.caveatEnforcers?.TimestampEnforcer?.toLowerCase();
+  const c = (delegation.caveats ?? []).find((x) => x.enforcer.toLowerCase() === enforcer);
+  if (!c || !/^0x[0-9a-fA-F]{64}$/.test(c.terms)) return null;
+  const before = Number(BigInt('0x' + c.terms.slice(34)));
+  return before > 0 ? before : null;
+}
+
+/**
  * Clerk settlement step. All I/O is injected so it can run against mocks, a local
- * fork, or (with Mike's approval) a live testnet.
+ * fork, or (with the owner's approval) a live testnet. The expiry is read from the
+ * signed delegation's Timestamp caveat, not passed in.
  *   readVerdict(): Promise<raw get_verdict JSON>
  *   sendTransaction({ to, data }): Promise<txHash>   (only called on REDEEM)
  */
-export async function settle({ signedDelegation, environment, agent, amountWei, expiresAt, caseContract, genlayerChainId, readVerdict, sendTransaction, nowSec }) {
+export async function settle({ signedDelegation, environment, agent, amountWei, caseContract, genlayerChainId, readVerdict, sendTransaction, nowSec }) {
+  const expiresAt = delegationExpiry(signedDelegation, environment);
+  if (!expiresAt) return { action: 'REFUSE', why: 'delegation has no Timestamp expiry caveat' };
   const expectedSalt = caseSalt(caseContract, genlayerChainId);
   if (BigInt(signedDelegation.salt) !== BigInt(expectedSalt)) {
     return { action: 'REFUSE', why: 'delegation salt does not match this GenLayer case' };

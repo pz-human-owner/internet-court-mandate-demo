@@ -6,8 +6,8 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { getSmartAccountsEnvironment, signDelegation } from '@metamask/smart-accounts-kit';
 import { SIGNABLE_DELEGATION_TYPED_DATA, decodeDelegations } from '@metamask/smart-accounts-kit/utils';
 import {
-  buildEscrowDelegation, caseSalt, decideSettlement, parseVerdict, redeemCalldata, disableCalldata, settle, SAMPLE_CASE,
-} from '../src/court-escrow.mjs';
+  buildPaymentDelegation, delegationExpiry, caseSalt, decideSettlement, parseVerdict, redeemCalldata, disableCalldata, settle, SAMPLE_CASE,
+} from '../src/verdict-payment.mjs';
 
 const env = getSmartAccountsEnvironment(11155111);
 const principal = getAddress('0x1111111111111111111111111111111111111111');
@@ -43,8 +43,8 @@ test('decideSettlement: only a resolved TRUE inside the window redeems', () => {
   assert.throws(() => decideSettlement({ status: 'resolved', verdict: 'MAYBE' }, w));
 });
 
-test('escrow delegation: delegator, delegate, salt and on-chain caveats', () => {
-  const d = buildEscrowDelegation(base);
+test('payment delegation: delegator, delegate, salt and on-chain caveats', () => {
+  const d = buildPaymentDelegation(base);
   assert.equal(d.delegator, principal);
   assert.equal(d.delegate, clerk);
   assert.equal(BigInt(d.salt), BigInt(caseSalt(SAMPLE_CASE)));
@@ -62,16 +62,16 @@ test('escrow delegation: delegator, delegate, salt and on-chain caveats', () => 
   assert.ok(ex.terms.toLowerCase().includes(agent.slice(2).toLowerCase()));
 });
 
-test('escrow delegation rejects bad input', () => {
-  assert.throws(() => buildEscrowDelegation({ ...base, amountWei: 0n }));
-  assert.throws(() => buildEscrowDelegation({ ...base, expiresAt: 0 }));
-  assert.throws(() => buildEscrowDelegation({ ...base, environment: undefined }));
+test('payment delegation rejects bad input', () => {
+  assert.throws(() => buildPaymentDelegation({ ...base, amountWei: 0n }));
+  assert.throws(() => buildPaymentDelegation({ ...base, expiresAt: 0 }));
+  assert.throws(() => buildPaymentDelegation({ ...base, environment: undefined }));
 });
 
 test('EIP-712 delegation signature recovers to the signer (offline)', async () => {
   const key = generatePrivateKey();
   const owner = privateKeyToAccount(key);
-  const d = buildEscrowDelegation({ ...base, principal: owner.address });
+  const d = buildPaymentDelegation({ ...base, principal: owner.address });
   const signature = await signDelegation({ privateKey: key, delegation: d, delegationManager: env.DelegationManager, chainId: 11155111 });
   const recovered = await recoverTypedDataAddress({
     domain: { name: 'DelegationManager', version: '1', chainId: 11155111, verifyingContract: env.DelegationManager },
@@ -82,7 +82,7 @@ test('EIP-712 delegation signature recovers to the signer (offline)', async () =
 });
 
 test('redeem calldata targets redeemDelegations with the signed delegation', () => {
-  const signed = fakeSigned(buildEscrowDelegation(base));
+  const signed = fakeSigned(buildPaymentDelegation(base));
   const data = redeemCalldata(signed, { agent, amountWei });
   const abi = parseAbi(['function redeemDelegations(bytes[] permissionContexts, bytes32[] modes, bytes[] executionCallDatas)']);
   const { functionName, args } = decodeFunctionData({ abi, data });
@@ -99,7 +99,7 @@ test('redeem calldata targets redeemDelegations with the signed delegation', () 
 });
 
 test('settle: TRUE sends one redeem tx to the DelegationManager', async () => {
-  const signed = fakeSigned(buildEscrowDelegation(base));
+  const signed = fakeSigned(buildPaymentDelegation(base));
   const sent = [];
   const r = await settle({ ...base, signedDelegation: signed, nowSec: 100,
     readVerdict: async () => JSON.stringify({ status: 'resolved', verdict: 'TRUE' }),
@@ -112,7 +112,7 @@ test('settle: TRUE sends one redeem tx to the DelegationManager', async () => {
 
 for (const [status, verdict, action] of [['resolved', 'FALSE', 'REFUSE'], ['resolved', 'UNDETERMINED', 'REFUSE'], ['submitted', '', 'WAIT']]) {
   test(`settle: ${status}/${verdict || '-'} never sends`, async () => {
-    const r = await settle({ ...base, signedDelegation: fakeSigned(buildEscrowDelegation(base)), nowSec: 100,
+    const r = await settle({ ...base, signedDelegation: fakeSigned(buildPaymentDelegation(base)), nowSec: 100,
       readVerdict: async () => JSON.stringify({ status, verdict }),
       sendTransaction: async () => { throw new Error('must not send'); } });
     assert.equal(r.action, action);
@@ -120,7 +120,7 @@ for (const [status, verdict, action] of [['resolved', 'FALSE', 'REFUSE'], ['reso
 }
 
 test('settle: refuses a delegation made for a different case', async () => {
-  const other = fakeSigned(buildEscrowDelegation({ ...base, caseContract: '0x0000000000000000000000000000000000000001' }));
+  const other = fakeSigned(buildPaymentDelegation({ ...base, caseContract: '0x0000000000000000000000000000000000000001' }));
   const r = await settle({ ...base, signedDelegation: other, nowSec: 100,
     readVerdict: async () => { throw new Error('should not even read'); },
     sendTransaction: async () => { throw new Error('must not send'); } });
@@ -128,8 +128,31 @@ test('settle: refuses a delegation made for a different case', async () => {
 });
 
 test('settle: expired window never sends', async () => {
-  const r = await settle({ ...base, signedDelegation: fakeSigned(buildEscrowDelegation(base)), nowSec: expiresAt + 1,
+  const r = await settle({ ...base, signedDelegation: fakeSigned(buildPaymentDelegation(base)), nowSec: expiresAt + 1,
     readVerdict: async () => JSON.stringify({ status: 'resolved', verdict: 'TRUE' }),
     sendTransaction: async () => { throw new Error('must not send'); } });
   assert.equal(r.action, 'EXPIRED');
+});
+
+test('delegationExpiry reads beforeThreshold from the signed Timestamp caveat', () => {
+  assert.equal(delegationExpiry(buildPaymentDelegation(base), env), expiresAt);
+  assert.equal(delegationExpiry({ caveats: [] }, env), null);
+});
+
+test('settle: uses the expiry in the signed delegation, not a caller-supplied one', async () => {
+  const signed = fakeSigned(buildPaymentDelegation({ ...base, expiresAt: 1000 }));
+  const r = await settle({ ...base, expiresAt: 9_999_999_999, signedDelegation: signed, nowSec: 1000,
+    readVerdict: async () => JSON.stringify({ status: 'resolved', verdict: 'TRUE' }),
+    sendTransaction: async () => { throw new Error('must not send'); } });
+  assert.equal(r.action, 'EXPIRED');
+});
+
+test('settle: refuses a delegation without a Timestamp caveat', async () => {
+  const d = buildPaymentDelegation(base);
+  const ts = env.caveatEnforcers.TimestampEnforcer.toLowerCase();
+  const noTs = fakeSigned({ ...d, caveats: d.caveats.filter((c) => c.enforcer.toLowerCase() !== ts) });
+  const r = await settle({ ...base, signedDelegation: noTs, nowSec: 100,
+    readVerdict: async () => { throw new Error('should not read'); },
+    sendTransaction: async () => { throw new Error('must not send'); } });
+  assert.equal(r.action, 'REFUSE');
 });
