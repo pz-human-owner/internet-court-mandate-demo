@@ -84,7 +84,7 @@
 <h3>Limits checked on-chain by MetaMask's Delegation Framework</h3>
 <ul>
  <li><b>Spending cap:</b> at most the 0.001 ETH fee, in total (<code>nativeTokenTransferAmount</code>)</li>
- <li><b>Plain transfer:</b> the call carries no calldata, so it cannot call a contract (<code>exactCalldata</code> with empty terms, added by the spending-cap scope)</li>
+ <li><b>Plain transfer:</b> requires empty calldata; no function call (<code>exactCalldata</code> with empty terms, added by the spending-cap scope)</li>
  <li><b>Exact payment:</b> the only allowed call sends exactly the fee to the named agent (<code>exactExecution</code>)</li>
  <li><b>Clerk only:</b> no other account can redeem (the delegation names the clerk as its delegate, and the <code>redeemer</code> caveat repeats it)</li>
  <li><b>Once:</b> a single redemption (<code>limitedCalls</code>)</li>

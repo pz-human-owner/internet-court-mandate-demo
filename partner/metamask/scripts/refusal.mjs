@@ -42,7 +42,7 @@ import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { Implementation, toMetaMaskSmartAccount, getSmartAccountsEnvironment } from '@metamask/smart-accounts-kit';
 import { LimitedCallsEnforcer } from '@metamask/delegation-abis';
-import { EXPECTED, GateError, rpcCall, simulateExpectedRevert, verifyMinedRevert } from '../src/refusal-gate.mjs';
+import { EXPECTED, GateError, blockedByFromReason, rpcCall, simulateExpectedRevert, verifyMinedRevert } from '../src/refusal-gate.mjs';
 import { buildPaymentDelegation, settle, redeemCalldata, hashDelegation, caseSalt, SAMPLE_CASE } from '../src/verdict-payment.mjs';
 import { makeVerdictReader, DEFAULT_GENLAYER_RPC } from '../src/genlayer-verdict.mjs';
 
@@ -84,6 +84,7 @@ if (cmd === 'verify') {
       const tx = await publicClient.getTransaction({ hash: t.hash });
       if (getAddress(tx.from) !== getAddress(t.from)) throw new GateError(`${step}: on-chain sender ${tx.from} != recorded ${t.from}`);
       if (getAddress(tx.to) !== getAddress(environment.DelegationManager)) throw new GateError(`${step}: tx is not to the DelegationManager`);
+      if (tx.value !== 0n) throw new GateError(`${step}: on-chain value ${tx.value} is not 0`);
       const v = await verifyMinedRevert({ label: step, rpc, receipt, tx, expected: EXPECTED[step] });
       if (Number(receipt.gasUsed) !== t.gasUsed) throw new GateError(`${step}: gasUsed ${receipt.gasUsed} != recorded ${t.gasUsed}`);
       results[step] = { hash: t.hash, from: tx.from, receiptStatus: receipt.status, block: v.block, gasUsed: Number(receipt.gasUsed),
@@ -174,10 +175,11 @@ out.clerkRefusals = [
 ];
 console.log('clerk refusals', bigintJson(out.clerkRefusals));
 
-async function revertingTx(label, step, wallet, signed, enforcer) {
+async function revertingTx(label, step, wallet, signed) {
   const data = redeemCalldata(signed, { agent, amountWei: fee });
   // Gate 1: simulate (eth_call) and require the EXPECTED decoded revert; anything else aborts before sending.
   const sim = await simulateExpectedRevert({ label, rpc, from: wallet.account.address, to: environment.DelegationManager, data, gas: GAS_LIMIT, expected: EXPECTED[step] });
+  const enforcer = blockedByFromReason(sim.reason, environment);
   const countBefore = await callCount(hashDelegation(signed));
   const hash = await wallet.sendTransaction({ to: environment.DelegationManager, data, gas: GAS_LIMIT });
   console.log(label, 'sent', hash);
@@ -199,8 +201,8 @@ async function revertingTx(label, step, wallet, signed, enforcer) {
 }
 
 const agentBefore = await publicClient.getBalance({ address: agent });
-const R1 = await revertingTx('R1 agent redeems the fresh delegation itself (skips the clerk)', 'R1', agentWallet, fresh, { by: 'DelegationManager (InvalidDelegate: caller is not the delegate)', address: environment.DelegationManager });
-const R2 = await revertingTx('R2 clerk redeems the already-paid live-run delegation a second time', 'R2', clerkWallet, spent.signed, { by: 'NativeTokenTransferAmountEnforcer (allowance-exceeded)', address: environment.caveatEnforcers.NativeTokenTransferAmountEnforcer });
+const R1 = await revertingTx('R1 agent redeems the fresh delegation itself (skips the clerk)', 'R1', agentWallet, fresh);
+const R2 = await revertingTx('R2 clerk redeems the already-paid live-run delegation a second time', 'R2', clerkWallet, spent.signed);
 const agentAfter = await publicClient.getBalance({ address: agent });
 out.transactions = { R1_outsiderRedeem: R1, R2_secondRedeem: R2 };
 out.balancesAfter = { clerkEth: await bal(clerk.address), agentEth: formatEther(agentAfter), principalSmartAccountEth: await bal(principal.address) };

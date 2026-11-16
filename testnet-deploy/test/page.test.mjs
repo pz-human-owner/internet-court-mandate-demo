@@ -77,4 +77,6 @@ test('refusal badge and notes do not call the clerk\'s repeat redemption unautho
   assert.match(panel, /an outsider's redemption and a repeat redemption both reverted/);
   assert.match(panel, /held 0 ETH at the time, so R1 shows that caller check, not a funded payment being blocked/);
   assert.match(panel, /<code>exactCalldata<\/code>/);
+  assert.match(panel, /requires empty calldata; no function call/);
+  assert.doesNotMatch(panel, /cannot call a contract/);
 });

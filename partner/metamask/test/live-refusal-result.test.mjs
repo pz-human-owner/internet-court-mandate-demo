@@ -48,6 +48,7 @@ test('R2: the already-paid live-run delegation cannot pay a second time', () => 
   assert.equal(getAddress(t.from), getAddress(r.accounts.clerk));
   assert.equal(t.delegationHash, live.delegation.hash);
   assert.equal(decode(t.simulatedRevertData), 'NativeTokenTransferAmountEnforcer:allowance-exceeded');
+  assert.equal(t.blockedBy, 'NativeTokenTransferAmountEnforcer (allowance-exceeded)');
   assert.equal(getAddress(t.blockedByAddress), getAddress(env.caveatEnforcers.NativeTokenTransferAmountEnforcer));
   assert.equal(t.limitedCallsCountBefore, 1);
   assert.equal(t.limitedCallsCountAfter, 1);

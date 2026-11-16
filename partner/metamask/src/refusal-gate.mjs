@@ -22,6 +22,22 @@ export class GateError extends Error {
   constructor(message) { super(message); this.name = 'GateError'; }
 }
 
+/** Map a decoded revert reason to the blockedBy label and contract address recorded in a result.
+ *  Labels must be derived from the observed reason: a hard-coded amount-enforcer label would
+ *  mis-attribute a future R2 that reverts with limit-exceeded. */
+export function blockedByFromReason(reason, environment) {
+  if (reason === 'InvalidDelegate') {
+    return { by: 'DelegationManager (InvalidDelegate: caller is not the delegate)', address: environment.DelegationManager };
+  }
+  if (reason === 'NativeTokenTransferAmountEnforcer:allowance-exceeded') {
+    return { by: 'NativeTokenTransferAmountEnforcer (allowance-exceeded)', address: environment.caveatEnforcers.NativeTokenTransferAmountEnforcer };
+  }
+  if (reason === 'LimitedCallsEnforcer:limit-exceeded') {
+    return { by: 'LimitedCallsEnforcer (limit-exceeded)', address: environment.caveatEnforcers.LimitedCallsEnforcer };
+  }
+  throw new GateError(`no blockedBy mapping for "${reason}"`);
+}
+
 /** Decode revert data from the DelegationManager (custom errors) or an enforcer (Error(string)).
  *  Returns the reason string, or null if the data is missing or does not decode. */
 export function decodeRevertData(data) {

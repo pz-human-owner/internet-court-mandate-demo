@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { encodeErrorResult, encodeAbiParameters } from 'viem';
 import { DelegationManager as DelegationManagerAbi } from '@metamask/delegation-abis';
-import { EXPECTED, GateError, decodeRevertData, checkSimulation, rpcCall, simulateExpectedRevert, verifyMinedRevert } from '../src/refusal-gate.mjs';
+import { EXPECTED, GateError, decodeRevertData, blockedByFromReason, checkSimulation, rpcCall, simulateExpectedRevert, verifyMinedRevert } from '../src/refusal-gate.mjs';
 
 const INVALID_DELEGATE = encodeErrorResult({ abi: DelegationManagerAbi, errorName: 'InvalidDelegate' });
 const errorString = (msg) => '0x08c379a0' + encodeAbiParameters([{ type: 'string' }], [msg]).slice(2);
@@ -31,6 +31,36 @@ test('expected reasons: R1 InvalidDelegate only; R2 allowance-exceeded or limit-
   assert.ok(EXPECTED.R2.includes('NativeTokenTransferAmountEnforcer:allowance-exceeded'));
   assert.ok(EXPECTED.R2.includes('LimitedCallsEnforcer:limit-exceeded'));
   assert.ok(!EXPECTED.R2.includes('InvalidDelegate'));
+});
+
+test('blockedBy is derived from the decoded reason, not hard-coded', () => {
+  const env = {
+    DelegationManager: '0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3',
+    caveatEnforcers: {
+      NativeTokenTransferAmountEnforcer: '0xF71af580b9c3078fbc2BBF16FbB8EEd82b330320',
+      LimitedCallsEnforcer: '0x04658B29F6b82ed55274221a06Fc97D318E25416',
+    },
+  };
+  assert.deepEqual(blockedByFromReason('InvalidDelegate', env), {
+    by: 'DelegationManager (InvalidDelegate: caller is not the delegate)',
+    address: env.DelegationManager,
+  });
+  assert.deepEqual(blockedByFromReason('NativeTokenTransferAmountEnforcer:allowance-exceeded', env), {
+    by: 'NativeTokenTransferAmountEnforcer (allowance-exceeded)',
+    address: env.caveatEnforcers.NativeTokenTransferAmountEnforcer,
+  });
+  assert.deepEqual(blockedByFromReason('LimitedCallsEnforcer:limit-exceeded', env), {
+    by: 'LimitedCallsEnforcer (limit-exceeded)',
+    address: env.caveatEnforcers.LimitedCallsEnforcer,
+  });
+  assert.throws(() => blockedByFromReason('TimestampEnforcer:expired-delegation', env), (e) => e instanceof GateError && /no blockedBy mapping/.test(e.message));
+  // The recorded R2 used allowance-exceeded, so its label must still map to the amount enforcer.
+  const rec = JSON.parse(readFileSync(new URL('../live-refusal-result.json', import.meta.url), 'utf8'));
+  const r2 = rec.transactions.R2_secondRedeem;
+  const derived = blockedByFromReason(r2.simulatedRevertReason, env);
+  assert.equal(r2.simulatedRevertReason, 'NativeTokenTransferAmountEnforcer:allowance-exceeded');
+  assert.equal(r2.blockedBy, derived.by);
+  assert.equal(r2.blockedByAddress.toLowerCase(), derived.address.toLowerCase());
 });
 
 test('pre-broadcast gate passes only the expected decoded revert', () => {

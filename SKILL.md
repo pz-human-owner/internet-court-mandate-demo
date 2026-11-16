@@ -102,7 +102,7 @@ the same six are in both recorded runs):
 
 | # | Caveat (enforcer) | Terms | Effect |
 |---|---|---|---|
-| 1 | `exactCalldata` ([`0x99F2…BdED`](https://sepolia.etherscan.io/address/0x99F2e9bF15ce5eC84685604836F71aB835DBBdED), ExactCalldataEnforcer) | `0x` | added by the `nativeTokenTransferAmount` scope: the call must carry empty calldata (a plain ETH transfer, no contract call) |
+| 1 | `exactCalldata` ([`0x99F2…BdED`](https://sepolia.etherscan.io/address/0x99F2e9bF15ce5eC84685604836F71aB835DBBdED), ExactCalldataEnforcer) | `0x` | added by the `nativeTokenTransferAmount` scope: requires empty calldata; no function call (a plain ETH transfer) |
 | 2 | `nativeTokenTransferAmount` ([`0xF71a…0320`](https://sepolia.etherscan.io/address/0xF71af580b9c3078fbc2BBF16FbB8EEd82b330320)) | `amountWei` | at most `amountWei` in total |
 | 3 | `exactExecution` ([`0x1467…bfbb`](https://sepolia.etherscan.io/address/0x146713078D39eCC1F5338309c28405ccf85Abfbb)) | agent, `amountWei`, `0x` | the only call allowed is "send exactly `amountWei` to `agent`" |
 | 4 | `redeemer` ([`0xE144…65c5`](https://sepolia.etherscan.io/address/0xE144b0b2618071B4E56f746313528a669c7E65c5)); the delegate is also the clerk | clerk | nobody but the clerk can redeem |
@@ -140,13 +140,16 @@ Rehearse on a local fork first (needs Foundry's `anvil`; broadcasts nothing; key
 Live on Sepolia, with fresh throwaway keys in `partner/metamask/.env` (gitignored; never commit it):
 
 ```bash
-cd partner/metamask && set -a; . ./.env; set +a     # OWNER_KEY, CLERK_KEY, AGENT_ADDRESS (+ AGENT_KEY for the refusal run)
-node scripts/live.mjs plan                # prints the transactions; sends nothing
-node scripts/live.mjs grant --broadcast   # deploy the smart account, fund the fee, sign the delegation (writes signed-delegation.json)
-node scripts/live.mjs settle --broadcast  # read the verdict; redeem only on TRUE
-node scripts/refusal.mjs plan             # prints the refusal steps; sends nothing
-node scripts/refusal.mjs run --broadcast --out my-refusal-result.json   # clerk refusals (no tx) + two deliberately reverting redemptions
-cd ../..
+(
+  set -e
+  cd partner/metamask
+  set -a; . ./.env; set +a     # OWNER_KEY, CLERK_KEY, AGENT_ADDRESS (+ AGENT_KEY for the refusal run)
+  node scripts/live.mjs plan                # prints the transactions; sends nothing
+  node scripts/live.mjs grant --broadcast   # deploy the smart account, fund the fee, sign the delegation (writes signed-delegation.json)
+  node scripts/live.mjs settle --broadcast  # read the verdict; redeem only on TRUE
+  node scripts/refusal.mjs plan             # prints the refusal steps; sends nothing
+  node scripts/refusal.mjs run --broadcast --out my-refusal-result.json   # clerk refusals (no tx) + two deliberately reverting redemptions
+)
 ```
 
 Without `--broadcast` both scripts refuse to send. **Who pays the gas:** in the payment run the clerk pays for all
