@@ -7,7 +7,7 @@ A principal writes a mandate, binds the evidence a jury may read, and appoints a
 
 The sample case binds official [MetaMask Smart Accounts Kit: Delegation](https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/) documentation (HTTP 200, no redirect, checked 15 November 2026). The mandate asks for a short briefing that mentions ERC-7710, explains that the delegator configures a scope and optional caveats, and never claims that the delegate holds the delegator's private key.
 
-**How MetaMask fits in, plainly:** the jury reads MetaMask's official delegation documentation as its evidence, and MetaMask is the optional browser signer if you deploy your own copy. That is the whole tie-in. This repository does not integrate the MetaMask Smart Accounts Kit or ERC-7710 in code; ERC-7710 appears only as a term the mandate asks the deliverable to mention. MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project is not endorsed by MetaMask.
+**How MetaMask fits in, plainly:** two ways. (1) The jury reads MetaMask's official delegation documentation as its evidence, and MetaMask is the optional browser signer if you deploy your own copy of the contract. (2) [`partner/metamask/`](partner/metamask/) settles the case with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/): the principal's MetaMask smart account signs an ERC-7710 delegation that can pay the agent a fixed fee once, and a settlement script redeems it only after the GenLayer contract returns TRUE. The delegation's limits are enforced on-chain by MetaMask's Delegation Framework; the verdict check is done by that script, not by a contract (see [MetaMask delegation settlement](#metamask-delegation-settlement)). So far that flow has run end to end on a local fork of Ethereum Sepolia against the real Bradbury verdict; it has not yet been run on a public testnet. MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project is not endorsed by MetaMask.
 
 ## Live demo
 
@@ -60,6 +60,31 @@ These rules are in `contracts/MandateVerdict.py` (`_normalize_ws`, `_quote_in_pa
 - A quote is **not** checked as verbatim, case-sensitive text. The contract collapses any whitespace to single spaces and compares with Unicode case folding (`casefold()`). For TRUE/FALSE, the normalized quote must be at least 12 characters and a substring of the normalized fetched page. The model is prompted to copy verbatim text; the enforcement is this normalized match.
 - Only the first 12,000 characters of the page, after fence-marker stripping, are placed in the model prompt. The quote-grounding check itself runs against the full fetched page text, not only that window.
 
+## MetaMask delegation settlement
+
+[`partner/metamask/`](partner/metamask/) turns the verdict into a payment decision with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/) (`@metamask/smart-accounts-kit` 2.0.0, [delegation guide](https://docs.metamask.io/smart-accounts-kit/guides/delegation/execute-on-smart-accounts-behalf/)).
+
+1. **Escrow.** The principal has a MetaMask Hybrid smart account on Ethereum Sepolia holding the agent's fee (0.001 ETH in the demo).
+2. **Grant.** The principal signs one ERC-7710 delegation (EIP-712, off-chain) to a settlement account, the *clerk*. Its salt is derived from the GenLayer case (chain 4221 + the MandateVerdict address), so the delegation names the case it settles. Its caveats are checked on-chain by MetaMask's Delegation Framework at redemption:
+   - [`nativeTokenTransferAmount`](https://docs.metamask.io/smart-accounts-kit/guides/delegation/use-delegation-scopes/spending-limit/) scope: at most the fee, in total
+   - [`exactExecution`](https://docs.metamask.io/smart-accounts-kit/reference/delegation/caveats/): the only allowed call is "send exactly the fee to the agent"
+   - `redeemer`: only the clerk may redeem
+   - `limitedCalls`: once
+   - `timestamp`: only before the expiry (7 days by default)
+3. **Settle.** The clerk reads `get_verdict` from the Bradbury contract (read-only `gen_call`). Resolved **TRUE**: it calls `DelegationManager.redeemDelegations` and the agent is paid. **FALSE** or **UNDETERMINED**: it refuses, and the delegation lapses at expiry. The principal can also revoke it early with [`disableDelegation`](https://docs.metamask.io/smart-accounts-kit/guides/delegation/disable-delegation/); the calldata is built in the code, but sending it needs a bundler and is not wired up. Not resolved yet: it waits.
+
+**What is enforced where.** GenLayer and Sepolia are separate chains with no oracle between them, so the verdict gate is the clerk's code, and the clerk is a trusted party. On-chain enforcement covers everything else: nobody but the clerk can redeem, nobody can redeem more than once or after expiry, and the only possible payment is the exact fee to the named agent. A dishonest clerk could pay the agent on a FALSE verdict. It could not pay anyone else, pay more, or pay twice.
+
+**What has been run.** `npm run simulate` starts a local [anvil](https://book.getfoundry.sh/anvil/) fork of Ethereum Sepolia, which includes MetaMask's deployed DelegationManager and enforcers. It uses throwaway keys that live only in memory and broadcasts nothing to any public network. Then it:
+- deploys the principal's smart account through `SimpleFactory`
+- funds it
+- signs the delegation
+- reads the **real** verdict from Bradbury (TRUE) and redeems, so the agent receives exactly 0.001 ETH
+- checks that a mocked FALSE verdict is refused without sending anything
+- checks that an outsider's redemption, a second redemption, and a redemption after expiry all revert on-chain
+
+The recorded output is in [`partner/metamask/sim-result.json`](partner/metamask/sim-result.json). A public Sepolia run (three transactions; `node scripts/live.mjs plan` lists them) has not been done yet.
+
 ## Architecture
 
 | Path | Role |
@@ -67,6 +92,7 @@ These rules are in `contracts/MandateVerdict.py` (`_normalize_ws`, `_quote_in_pa
 | `contracts/MandateVerdict.py` | The Intelligent Contract. Pinned to the Bradbury runner `py-genlayer:babwp9t37jw9g4j2bccgn14g6x7x9s1f7dsmh7emvz735pz4zxa0` and written against the current GenLayer Python API (`import genlayer as gl`, `gl.contract.Contract`, `gl.vm.run_nondet`). |
 | `examples/` | Sample mandate (with the bound evidence URL) and pass / fail / undetermined deliverables. |
 | `testnet-deploy/` | The demo page. By default it reads the live verdict of the deployed sample case without a wallet; an optional section deploys to Bradbury and runs one case, with every transaction signed in the browser with MetaMask. |
+| `partner/metamask/` | Verdict-gated MetaMask Smart Accounts Kit (ERC-7710) delegation: the code that builds the delegation and settles it, offline unit tests, a local Sepolia-fork simulation, and a live runner that only sends with `--broadcast`. |
 | `tests/direct/` | Optional in-memory tests of the contract file via `genlayer-test`. |
 | `proof/` | Dated raw JSON-RPC receipts for the sample Bradbury run, with commands to reproduce. Also copied into the page build for its fallback view. |
 | `.github/workflows/pages.yml` | On push to `main`: `npm ci`, `npm test`, `npm run build` in `testnet-deploy/`, then publishes `testnet-deploy/dist` to GitHub Pages. Uses only the built-in `GITHUB_TOKEN`. |
@@ -105,6 +131,16 @@ cd testnet-deploy
 npm ci
 npm test          # network-free unit tests of chain, genesis, send guards, and live-view helpers
 npm run build     # writes dist/ (bundled app, contract, sample case, proof/ receipts)
+```
+
+MetaMask delegation (Node 20+). The unit tests are network-free. The simulation needs [Foundry](https://book.getfoundry.sh/)'s `anvil` and reads a public Sepolia RPC and the Bradbury RPC; it broadcasts nothing:
+
+```bash
+cd partner/metamask
+npm ci
+npm test          # delegation shape, caveats, salt binding, signature recovery, settle() decisions
+npm run simulate  # local anvil fork of Sepolia: deploy, fund, sign, read the live verdict, redeem
+npm run plan      # prints the three public-testnet transactions a live run would send
 ```
 
 Optional contract tests (Python 3.11+). These use a local GenVM stand-in, not the live network:
@@ -146,7 +182,7 @@ Each transaction sends a fee deposit as `value`; unused budget is refunded at fi
 ## Limitations
 
 - **One case per contract.** A registry of many mandates would be a later revision.
-- **Trusted attester for any EVM settlement.** This repository does not include a settlement contract. Bridging a GenLayer verdict into an EVM payment — for example, unlocking a MetaMask Smart Accounts Kit (ERC-7710) delegation only when `get_verdict` is TRUE — would require a trusted attester to copy the verdict into an oracle or caveat enforcer. That attester is a trust assumption, not a trustless bridge.
+- **The settlement clerk is trusted.** `partner/metamask/` gates the MetaMask delegation on the verdict in off-chain code. MetaMask's caveat enforcers limit what the clerk can do (exact fee, to the named agent, once, before expiry), but no contract checks the GenLayer verdict on Sepolia. A trustless version would need an oracle or a bridge that carries the verdict to the EVM chain, plus a caveat enforcer that reads it.
 - **Local tests use a v0.3-dev stand-in.** `tests/direct` runs the contract in genlayer-test's in-memory VM with mocked web and model responses. That environment is a v0.3-dev stand-in, not the exact Bradbury runner pinned in the contract header, and it is not a network consensus run. The on-chain proof above is the authoritative result.
 - **Submitted-URL binding is not the fetched page.** GenVM follows redirects and does not expose the final URL, so a bound URL can still lead the jury to a page the agent controls if that page is the redirect target. With prefix binding, the agent can also submit any path under the allowed prefix, including a page it controls there. See [Evidence-URL policy](#evidence-url-policy).
 - **Quote matching is normalized, and the model sees a truncated page.** See [Quote matching and page window](#quote-matching-and-page-window).

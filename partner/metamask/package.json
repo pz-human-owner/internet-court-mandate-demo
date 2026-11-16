@@ -1,0 +1,18 @@
+{
+  "name": "internet-court-metamask-delegation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Verdict-gated MetaMask Smart Accounts Kit (ERC-7710) delegation: pay the agent only when the GenLayer MandateVerdict jury says TRUE.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "simulate": "node scripts/simulate-fork.mjs --out sim-result.json",
+    "plan": "node scripts/live.mjs plan"
+  },
+  "dependencies": {
+    "@metamask/smart-accounts-kit": "2.0.0",
+    "genlayer-js": "2.0.0-rc.3",
+    "viem": "2.57.20"
+  }
+}

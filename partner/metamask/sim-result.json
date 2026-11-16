@@ -1,0 +1,71 @@
+{
+  "note": "Local anvil fork of Sepolia. Nothing broadcast. Throwaway in-memory keys.",
+  "forkUrl": "https://ethereum-sepolia-rpc.publicnode.com",
+  "log": [
+    {
+      "step": "fork",
+      "chainId": 11155111,
+      "forkBlock": "12149169",
+      "delegationManager": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+      "dmHasCode": true
+    },
+    {
+      "step": "A deploy principal smart account (fork)",
+      "smartAccount": "0xd9362536F5f28723d1EE7d5eddFBF09c1887fB3E",
+      "status": "success",
+      "gasUsed": "825911"
+    },
+    {
+      "step": "B fund principal smart account (fork)",
+      "value": "0.001",
+      "status": "success"
+    },
+    {
+      "step": "sign delegation (off-chain)",
+      "delegationHash": "0x9a28beefa2f450e8f5e73ffbee020abc846e14ecec7765b01623885b5c4daac5",
+      "caveats": 6,
+      "salt": "0x4ecd88166fcf7b929f66342a4ee81440ff553e1f8b76c8bcf763ace4107de8c1"
+    },
+    {
+      "step": "outsider redemption reverted",
+      "status": "reverted"
+    },
+    {
+      "step": "settle with mocked FALSE verdict",
+      "action": "REFUSE",
+      "why": "jury verdict FALSE: payment withheld; the delegation lapses at expiry"
+    },
+    {
+      "step": "settle with GenLayer verdict",
+      "verdictSource": "Bradbury gen_call get_verdict on 0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B",
+      "status": "resolved",
+      "verdict": "TRUE",
+      "action": "REDEEM",
+      "redeemStatus": "success",
+      "gasUsed": "626908",
+      "agentReceived": "0.001"
+    },
+    {
+      "step": "second redemption reverted",
+      "status": "reverted"
+    },
+    {
+      "step": "redemption after expiry reverted",
+      "status": "reverted"
+    },
+    {
+      "step": "caveat enforcers in the signed delegation",
+      "enforcers": [
+        "ExactCalldataEnforcer",
+        "NativeTokenTransferAmountEnforcer",
+        "ExactExecutionEnforcer",
+        "RedeemerEnforcer",
+        "LimitedCallsEnforcer",
+        "TimestampEnforcer"
+      ]
+    },
+    {
+      "step": "PASS"
+    }
+  ]
+}
