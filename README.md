@@ -1,14 +1,17 @@
 # Internet Court Mandate Demo
 
+**Live demo (no wallet needed):** https://pz-human-owner.github.io/internet-court-mandate-demo/  
+**Demo video (41 s):** [mission101_demo_v3.mp4](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/download/v1.1-demo/mission101_demo_v3.mp4) on the [v1.1-demo release](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/tag/v1.1-demo)
+
 A principal writes a mandate, binds the evidence a jury may read, and appoints an agent. The agent submits a deliverable. A [GenLayer](https://docs.genlayer.com/) Intelligent Contract then acts as an [Internet Court](https://internetcourt.org/)-style jury: validators fetch a page at the submitted source URL and record whether the deliverable met the mandate.
 
 The sample case binds official [MetaMask Smart Accounts Kit: Delegation](https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/) documentation (HTTP 200, no redirect, checked 15 November 2026). The mandate asks for a short briefing that mentions ERC-7710, explains that the delegator configures a scope and optional caveats, and never claims that the delegate holds the delegator's private key.
 
-MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project uses MetaMask's public documentation as evidence and MetaMask in the browser to sign testnet transactions. It is not endorsed by MetaMask.
+**How MetaMask fits in, plainly:** the jury reads MetaMask's official delegation documentation as its evidence, and MetaMask is the optional browser signer if you deploy your own copy. That is the whole tie-in. This repository does not integrate the MetaMask Smart Accounts Kit or ERC-7710 in code; ERC-7710 appears only as a term the mandate asks the deliverable to mention. MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project is not endorsed by MetaMask.
 
 ## Live demo
 
-Hosted page: **https://pz-human-owner.github.io/internet-court-mandate-demo/** (served by GitHub Pages from `testnet-deploy/` via [`.github/workflows/pages.yml`](.github/workflows/pages.yml); the link works only once GitHub Pages is enabled for this repository with Source: GitHub Actions).
+Hosted page: **https://pz-human-owner.github.io/internet-court-mandate-demo/** (served by GitHub Pages from `testnet-deploy/` via [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on every push to `main`).
 
 - **View the live verdict (default, no wallet).** On load the page reads the deployed sample case, contract [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B) on Bradbury, with read-only `gen_call` views (`get_status`, `get_verdict`, `get_case`) and shows the mandate, deliverable, verdict, reasoning, supporting quote, and explorer links. Nothing is signed or sent. If the RPC cannot be reached, the page says so and shows the recorded result of the Nov 15 run with links to the [`proof/`](proof/) receipts and the explorer. Add `?contract=0x…` to read a different MandateVerdict contract.
 - **Try it with MetaMask (optional).** A collapsed section deploys your own copy from your own MetaMask wallet. It sends real Bradbury testnet transactions and needs testnet GEN; see [Deploy on Bradbury](#deploy-on-bradbury).
