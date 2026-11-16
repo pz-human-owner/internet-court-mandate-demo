@@ -39,5 +39,9 @@ On 16 November 2026 (22:52–22:53 UTC) `node scripts/refusal.mjs run --broadcas
 | R1. The agent redeems the fresh delegation itself | [`0x323887a0…`](https://sepolia.etherscan.io/tx/0x323887a077ab6f8be8226ab47f259f7a1b6562df2627db31f8ee5e592c33528b) | 12150397 | reverted: DelegationManager `InvalidDelegate` |
 | R2. The clerk redeems the delegation paid in step C again | [`0x28c9837c…`](https://sepolia.etherscan.io/tx/0x28c9837c4137efd47ef85cac8940499cb792dfbc53b8860d9a41b3f92755d640) | 12150399 | reverted: `NativeTokenTransferAmountEnforcer:allowance-exceeded` |
 
+The agent's throwaway key sent and paid for R1 (2,532,840 wei of gas), so a rerun needs a little Sepolia ETH on the agent address; the clerk paid for R2. The principal's smart account held 0 ETH during R1, so R1 shows the delegate (caller) check, not a funded payment being blocked.
+
+The runner now sends R1 or R2 only if an `eth_call` simulation reverts with the expected decoded reason (any RPC error, rate limit or other reason aborts before sending), requires a `reverted` receipt and a matching parent-block replay after mining, exits non-zero and writes nothing otherwise, and never overwrites an existing record (`run --broadcast --out <new-file>`). `node scripts/refusal.mjs verify` re-checks the recorded R1 and R2 read-only (it needs an archive-capable Sepolia RPC in `SEPOLIA_RPC_URL`); its 16 November 2026 result is under `independentReverification`. The gate is unit-tested in [`test/refusal-gate.test.mjs`](test/refusal-gate.test.mjs).
+
 Record: [`live-refusal-result.json`](live-refusal-result.json). Still not run on a public chain: a live FALSE or UNDETERMINED verdict (the only deployed case resolved TRUE, and no new GenLayer transactions were made) and a redemption after expiry. Those are covered by the unit tests and the local fork simulation.
 

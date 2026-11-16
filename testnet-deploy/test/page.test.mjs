@@ -71,3 +71,10 @@ test('SKILL.md is linked from the hero and the footer', () => {
 test('page is not tied to unrelated products', () => {
   assert.doesNotMatch(html, /lens ?closer|lens labs/i);
 });
+
+test('refusal badge and notes do not call the clerk\'s repeat redemption unauthorized', () => {
+  assert.doesNotMatch(html, /unauthori[sz]ed/i);
+  assert.match(panel, /an outsider's redemption and a repeat redemption both reverted/);
+  assert.match(panel, /held 0 ETH at the time, so R1 shows that caller check, not a funded payment being blocked/);
+  assert.match(panel, /<code>exactCalldata<\/code>/);
+});

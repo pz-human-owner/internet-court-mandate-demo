@@ -57,7 +57,7 @@
 <section class="settle" id="mm-settle" aria-labelledby="mm-settle-h">
 <h2 id="mm-settle-h">Partner settlement: MetaMask delegation</h2>
 <p>The verdict above also decides a payment. Using the <a href="https://docs.metamask.io/smart-accounts-kit/">MetaMask Smart Accounts Kit</a> (an ERC-7710 delegation), the principal's MetaMask smart account on Ethereum Sepolia lets a settlement account, the <em>clerk</em>, pay the agent, but only in one exact way.</p>
-<p><span class="badge">Live on Sepolia: verdict TRUE → agent paid 0.001 ETH</span> <span class="badge no">Live on Sepolia: 2 unauthorized redemptions reverted</span></p>
+<p><span class="badge">Live on Sepolia: verdict TRUE → agent paid 0.001 ETH</span> <span class="badge no">Live on Sepolia: an outsider's redemption and a repeat redemption both reverted</span></p>
 <ol class="flow" aria-label="How the payment follows the verdict">
  <li><b>1 · Grant</b>The principal signs one delegation to the clerk: “pay the agent exactly 0.001 ETH, once, before expiry.” This is an off-chain signature, not a transaction.</li>
  <li class="ok"><b>2 · Verdict TRUE → paid</b>The clerk reads <code>get_verdict</code> from this GenLayer contract. On a resolved TRUE it redeems the delegation through MetaMask's DelegationManager, and the agent receives 0.001 ETH.</li>
@@ -84,10 +84,11 @@
 <h3>Limits checked on-chain by MetaMask's Delegation Framework</h3>
 <ul>
  <li><b>Spending cap:</b> at most the 0.001 ETH fee, in total (<code>nativeTokenTransferAmount</code>)</li>
+ <li><b>Plain transfer:</b> the call carries no calldata, so it cannot call a contract (<code>exactCalldata</code> with empty terms, added by the spending-cap scope)</li>
  <li><b>Exact payment:</b> the only allowed call sends exactly the fee to the named agent (<code>exactExecution</code>)</li>
  <li><b>Clerk only:</b> no other account can redeem (the delegation names the clerk as its delegate, and the <code>redeemer</code> caveat repeats it)</li>
  <li><b>Once:</b> a single redemption (<code>limitedCalls</code>)</li>
- <li><b>Expiry:</b> only before a deadline (<code>timestamp</code>; the live run used 7 days)</li>
+ <li><b>Expiry:</b> only before a deadline (<code>timestamp</code>; the payment run used 7 days, the refusal run's fresh delegation one hour)</li>
 </ul>
 
 <h3>What this does not prove</h3>
@@ -95,7 +96,7 @@
  <li><b>The clerk is trusted.</b> GenLayer and Sepolia have no oracle between them, so the clerk's code checks the verdict and the case label (a salt derived from GenLayer chain 4221 + this contract). No contract checks them on Sepolia.</li>
  <li><b>It isn't an escrow.</b> The fee sits in the principal's own smart account, and the owner could move it out before redemption.</li>
  <li><b>One operator.</b> The same operator held the throwaway owner, clerk and agent keys. The clerk paid the gas and funded the fee for the payment run; in the refusal run the agent paid R1's gas from the fee it had received.</li>
- <li><b>Now live on Sepolia, not just simulated:</b> an outsider redemption and a second redemption, both reverted on-chain (R1, R2). R1 was stopped by the DelegationManager's delegate check before the <code>redeemer</code> caveat ran. R2 was stopped by the spending cap; the <code>limitedCalls</code> count was already 1 and would also have blocked it.</li>
+ <li><b>Now live on Sepolia, not just simulated:</b> an outsider redemption and a second redemption, both reverted on-chain (R1, R2). R1 was stopped by the DelegationManager's delegate check before the <code>redeemer</code> caveat ran; the principal's smart account held 0 ETH at the time, so R1 shows that caller check, not a funded payment being blocked. R2 was stopped by the spending cap; the <code>limitedCalls</code> count was already 1 and would also have blocked it.</li>
  <li><b>Still simulated only:</b> a live FALSE or UNDETERMINED verdict (the only deployed case resolved TRUE, and no new GenLayer transactions were made), and a redemption after expiry. Those run in the unit tests and on a local Sepolia fork. The refusal in the first refusal row is the clerk's code, not a chain rule.</li>
 </ul>
 </section>

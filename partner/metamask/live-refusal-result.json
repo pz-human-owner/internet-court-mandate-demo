@@ -156,15 +156,56 @@
     "freshDelegationCallCount": 0
   },
   "finishedAtUtc": "2026-11-16T22:53:15.946Z",
-  "gasNote": "Both reverts report the same gasUsed (168856). The two calls have the same calldata layout, and that figure appears to be set by calldata cost rather than execution; this is an inference, not traced. The public RPC used offers no debug_traceTransaction.",
+  "gasNote": "Both reverts report the same gasUsed (168856); a read-only re-check of both receipts (independentReverification) confirms it, and each sender's balance fell by exactly 168856 x 15 wei = 2532840 wei. Equal gasUsed observed; cause not traced (the public RPCs used offer no debug_traceTransaction).",
   "whatThisShows": [
     "Clerk code: a delegation bound to a different GenLayer case is refused even while the sample case's live verdict is TRUE (no transaction).",
     "Clerk code: with no readable verdict for the delegation's own case, nothing is sent.",
-    "On-chain R1: the agent cannot redeem a delegation by itself; MetaMask's DelegationManager reverts with InvalidDelegate (only the named delegate, the clerk, may redeem).",
-    "On-chain R2: the delegation already paid in the live run cannot pay again; NativeTokenTransferAmountEnforcer reverts with allowance-exceeded (its LimitedCalls count is already 1, which would also block it)."
+    "On-chain R1: the agent cannot redeem a delegation by itself; MetaMask's DelegationManager reverts with InvalidDelegate (only the named delegate, the clerk, may redeem). The principal smart account held 0 ETH before and after R1, so R1 shows the delegate (caller) check, not a funded payment being blocked.",
+    "On-chain R2: the clerk (the authorized delegate) cannot redeem the delegation already paid in the live run a second time; NativeTokenTransferAmountEnforcer reverts with allowance-exceeded (its LimitedCalls count is already 1, which would also block it; that second block was not observed on-chain)."
   ],
   "whatThisDoesNotShow": [
     "A live FALSE or UNDETERMINED GenLayer verdict. The only deployed case resolved TRUE, and no new GenLayer transactions were made; the FALSE and UNDETERMINED paths are covered by offline unit tests and the local fork simulation.",
     "That the verdict is enforced on-chain. The verdict and case checks are still in the clerk's code; a dishonest clerk could redeem a delegation addressed to it, within the caveats."
-  ]
+  ],
+  "independentReverification": {
+    "method": "node scripts/refusal.mjs verify (read-only: eth_getTransactionReceipt, eth_getTransactionByHash, eth_call replay at the parent block; no transactions)",
+    "rpc": "https://sepolia.gateway.tenderly.co",
+    "atUtc": "2026-11-16T23:22:25.833Z",
+    "passed": true,
+    "transactions": {
+      "R1": {
+        "hash": "0x323887a077ab6f8be8226ab47f259f7a1b6562df2627db31f8ee5e592c33528b",
+        "from": "0x8b5deee4a52c321c81c33b2bc99834eb05b04929",
+        "receiptStatus": "reverted",
+        "block": 12150397,
+        "gasUsed": 168856,
+        "effectiveGasPriceWei": "15",
+        "feePaidWei": "2532840",
+        "valueWei": "0",
+        "replayBlock": 12150396,
+        "replayRevertData": "0xb5863604",
+        "replayDecoded": "InvalidDelegate",
+        "expected": [
+          "InvalidDelegate"
+        ]
+      },
+      "R2": {
+        "hash": "0x28c9837c4137efd47ef85cac8940499cb792dfbc53b8860d9a41b3f92755d640",
+        "from": "0x906b4d9d64a5d4bb559292a3f24562835a122d10",
+        "receiptStatus": "reverted",
+        "block": 12150399,
+        "gasUsed": 168856,
+        "effectiveGasPriceWei": "15",
+        "feePaidWei": "2532840",
+        "valueWei": "0",
+        "replayBlock": 12150398,
+        "replayRevertData": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000344e6174697665546f6b656e5472616e73666572416d6f756e74456e666f726365723a616c6c6f77616e63652d6578636565646564000000000000000000000000",
+        "replayDecoded": "NativeTokenTransferAmountEnforcer:allowance-exceeded",
+        "expected": [
+          "NativeTokenTransferAmountEnforcer:allowance-exceeded",
+          "LimitedCallsEnforcer:limit-exceeded"
+        ]
+      }
+    }
+  }
 }

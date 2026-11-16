@@ -2,7 +2,17 @@
 // only with --broadcast. Run once on 2026-11-16; see live-refusal-result.json.
 //
 //   node scripts/refusal.mjs plan                 # prints the steps; no keys, no network writes
-//   node scripts/refusal.mjs run --broadcast      # off-chain clerk refusals + 2 deliberately reverting txs
+//   node scripts/refusal.mjs verify [--write]     # read-only: re-check the recorded R1/R2 on Sepolia
+//   node scripts/refusal.mjs run --broadcast --out <new-file.json>
+//                                                 # off-chain clerk refusals + 2 deliberately reverting txs
+//
+// Evidence gate (src/refusal-gate.mjs): R1/R2 are broadcast only if eth_call reverts with the
+// EXPECTED decoded reason (R1 InvalidDelegate; R2 NativeTokenTransferAmountEnforcer:allowance-exceeded
+// or LimitedCallsEnforcer:limit-exceeded). Any other outcome (no revert, RPC/transport error, rate
+// limit, undecodable data, a different reason) aborts before sending. After mining, the receipt must
+// be `reverted` and a replay at the parent block must decode to the expected reason. If any check
+// fails the script exits non-zero and writes nothing. `run` never overwrites an existing file: the
+// recorded live-refusal-result.json is the evidence, so a new run must name a new --out file.
 //
 // What it shows:
 //   1. Clerk code refuses (no transaction) a freshly signed delegation that is bound to a
@@ -20,15 +30,19 @@
 // so the failed transactions are mined and visible on Etherscan.
 //
 // Inputs from the environment (partner/metamask/.env, gitignored; `set -a; . ./.env; set +a`):
-//   OWNER_KEY, CLERK_KEY, AGENT_KEY   throwaway testnet keys only (never printed)
+//   OWNER_KEY, CLERK_KEY, AGENT_KEY   throwaway testnet keys only (never printed). R1 is sent and
+//                                      paid for by the AGENT key, so the agent address needs a little
+//                                      Sepolia ETH (R1 cost about 2.5 million wei); R2 is paid by the clerk.
 //   SEPOLIA_RPC_URL                    default https://ethereum-sepolia-rpc.publicnode.com
 // Reads signed-delegation.json (the spent delegation from `live.mjs grant`).
-import { readFileSync, writeFileSync } from 'node:fs';
-import { createPublicClient, createWalletClient, http, parseEther, formatEther, getAddress, keccak256, toHex, decodeErrorResult } from 'viem';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { createPublicClient, createWalletClient, http, parseEther, formatEther, getAddress, keccak256, toHex } from 'viem';
 import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { Implementation, toMetaMaskSmartAccount, getSmartAccountsEnvironment } from '@metamask/smart-accounts-kit';
-import { LimitedCallsEnforcer, DelegationManager as DelegationManagerAbi } from '@metamask/delegation-abis';
+import { LimitedCallsEnforcer } from '@metamask/delegation-abis';
+import { EXPECTED, GateError, rpcCall, simulateExpectedRevert, verifyMinedRevert } from '../src/refusal-gate.mjs';
 import { buildPaymentDelegation, settle, redeemCalldata, hashDelegation, caseSalt, SAMPLE_CASE } from '../src/verdict-payment.mjs';
 import { makeVerdictReader, DEFAULT_GENLAYER_RPC } from '../src/genlayer-verdict.mjs';
 
@@ -46,20 +60,65 @@ if (cmd === 'plan' || !cmd) {
   -  OWNER signs a fresh delegation bound to case ${NO_SUCH_CASE} (off-chain, no tx)
   -  CLERK settle() for case ${SAMPLE_CASE} (verdict TRUE) with that delegation -> REFUSE, no tx
   -  CLERK settle() for case ${NO_SUCH_CASE} -> no readable verdict, no tx
-  R1 AGENT -> DelegationManager.redeemDelegations(fresh delegation)   expected revert (DelegationManager InvalidDelegate), gas limit ${GAS_LIMIT}
-  R2 CLERK -> DelegationManager.redeemDelegations(spent delegation)   expected revert (NativeTokenTransferAmountEnforcer allowance-exceeded), gas limit ${GAS_LIMIT}`);
+  R1 AGENT -> DelegationManager.redeemDelegations(fresh delegation)   sent only if eth_call reverts with ${EXPECTED.R1.join(' / ')}; agent pays the gas; gas limit ${GAS_LIMIT}
+  R2 CLERK -> DelegationManager.redeemDelegations(spent delegation)   sent only if eth_call reverts with ${EXPECTED.R2.join(' / ')}; clerk pays the gas; gas limit ${GAS_LIMIT}
+  After mining: receipt must be reverted and a parent-block replay must give the same reason, else exit 1 and write nothing`);
   process.exit(0);
 }
-if (cmd !== 'run' || !process.argv.includes('--broadcast')) {
-  console.error('Refusing to send transactions without `run --broadcast`. Run `plan` first and get approval.');
-  process.exit(2);
-}
-for (const k of ['OWNER_KEY', 'CLERK_KEY', 'AGENT_KEY']) if (!env[k]) throw new Error(`${k} is not set`);
 
 const rpcUrl = env.SEPOLIA_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com';
+const RECORD = new URL('../live-refusal-result.json', import.meta.url);
+const rpc = (method, params) => rpcCall(rpcUrl, method, params);
+const fail = (e) => { console.error(`FAILED (nothing written): ${e.message}`); process.exit(1); };
+
+if (cmd === 'verify') {
+  // Read-only re-verification of the recorded R1/R2. Sends nothing and needs no keys.
+  try {
+    const rec = JSON.parse(readFileSync(RECORD, 'utf8'));
+    const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
+    if ((await publicClient.getChainId()) !== sepolia.id) throw new GateError('RPC is not Sepolia');
+    const results = {};
+    for (const [key, step] of [['R1_outsiderRedeem', 'R1'], ['R2_secondRedeem', 'R2']]) {
+      const t = rec.transactions[key];
+      const receipt = await publicClient.getTransactionReceipt({ hash: t.hash });
+      const tx = await publicClient.getTransaction({ hash: t.hash });
+      if (getAddress(tx.from) !== getAddress(t.from)) throw new GateError(`${step}: on-chain sender ${tx.from} != recorded ${t.from}`);
+      if (getAddress(tx.to) !== getAddress(environment.DelegationManager)) throw new GateError(`${step}: tx is not to the DelegationManager`);
+      const v = await verifyMinedRevert({ label: step, rpc, receipt, tx, expected: EXPECTED[step] });
+      if (Number(receipt.gasUsed) !== t.gasUsed) throw new GateError(`${step}: gasUsed ${receipt.gasUsed} != recorded ${t.gasUsed}`);
+      results[step] = { hash: t.hash, from: tx.from, receiptStatus: receipt.status, block: v.block, gasUsed: Number(receipt.gasUsed),
+        effectiveGasPriceWei: receipt.effectiveGasPrice.toString(), feePaidWei: (receipt.gasUsed * receipt.effectiveGasPrice).toString(),
+        valueWei: tx.value.toString(), replayBlock: v.replayBlock, replayRevertData: v.replayRevertData, replayDecoded: v.replayDecoded, expected: EXPECTED[step] };
+    }
+    const out = { method: 'node scripts/refusal.mjs verify (read-only: eth_getTransactionReceipt, eth_getTransactionByHash, eth_call replay at the parent block; no transactions)',
+      rpc: rpcUrl, atUtc: new Date().toISOString(), passed: true, transactions: results };
+    console.log(bigintJson(out));
+    if (process.argv.includes('--write')) {
+      rec.independentReverification = out;
+      writeFileSync(RECORD, bigintJson(rec) + '\n');
+      console.log('updated independentReverification in live-refusal-result.json');
+    }
+    process.exit(0);
+  } catch (e) { fail(e); }
+}
+
+if (cmd !== 'run' || !process.argv.includes('--broadcast')) {
+  console.error('Refusing to send transactions without `run --broadcast --out <new-file.json>`. Run `plan` first and get approval.');
+  process.exit(2);
+}
+const outIdx = process.argv.indexOf('--out');
+const outPath = outIdx > 0 && process.argv[outIdx + 1] ? resolve(process.argv[outIdx + 1]) : RECORD.pathname;
+if (existsSync(outPath)) {
+  console.error(`Refusing: ${outPath} already exists. The recorded run is the evidence; pass --out <new-file.json>.`);
+  process.exit(2);
+}
+for (const k of ['OWNER_KEY', 'CLERK_KEY', 'AGENT_KEY']) if (!env[k]) { console.error(`${k} is not set`); process.exit(2); }
+process.on('unhandledRejection', fail);
+process.on('uncaughtException', fail);
+
 const transport = http(rpcUrl);
 const publicClient = createPublicClient({ chain: sepolia, transport });
-if ((await publicClient.getChainId()) !== sepolia.id) throw new Error('RPC is not Sepolia');
+if ((await publicClient.getChainId()) !== sepolia.id) fail(new Error('RPC is not Sepolia'));
 const owner = privateKeyToAccount(env.OWNER_KEY);
 const clerk = privateKeyToAccount(env.CLERK_KEY);
 const agentAcct = privateKeyToAccount(env.AGENT_KEY);
@@ -115,36 +174,33 @@ out.clerkRefusals = [
 ];
 console.log('clerk refusals', bigintJson(out.clerkRefusals));
 
-async function revertingTx(label, wallet, signed, enforcer) {
+async function revertingTx(label, step, wallet, signed, enforcer) {
   const data = redeemCalldata(signed, { agent, amountWei: fee });
-  // Simulate first (eth_call) and keep the raw revert data; refuse to send if it would succeed.
-  const sim = await fetch(rpcUrl, { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ from: wallet.account.address, to: environment.DelegationManager, data }, 'latest'] }) }).then((r) => r.json());
-  if (!sim.error) throw new Error(`${label}: eth_call did not revert; refusing to send`);
-  const simulatedRevertData = sim.error.data ?? '0x';
-  let simulatedRevert = sim.error.message;
-  try {
-    const dec = decodeErrorResult({ abi: DelegationManagerAbi, data: simulatedRevertData });
-    simulatedRevert = dec.errorName === 'Error' ? dec.args[0] : dec.errorName;
-  } catch { /* keep the RPC message */ }
+  // Gate 1: simulate (eth_call) and require the EXPECTED decoded revert; anything else aborts before sending.
+  const sim = await simulateExpectedRevert({ label, rpc, from: wallet.account.address, to: environment.DelegationManager, data, gas: GAS_LIMIT, expected: EXPECTED[step] });
   const countBefore = await callCount(hashDelegation(signed));
   const hash = await wallet.sendTransaction({ to: environment.DelegationManager, data, gas: GAS_LIMIT });
+  console.log(label, 'sent', hash);
   const rc = await publicClient.waitForTransactionReceipt({ hash });
+  // Gate 2: the mined tx must have reverted, and a parent-block replay must give the expected reason.
+  const tx = await publicClient.getTransaction({ hash });
+  const mined = await verifyMinedRevert({ label, rpc, receipt: rc, tx, expected: EXPECTED[step] });
   const block = await publicClient.getBlock({ blockNumber: rc.blockNumber });
   const countAfter = await callCount(hashDelegation(signed));
   const r = {
     label, hash, etherscan: ex(hash), status: rc.status, block: Number(rc.blockNumber), timestampUtc: new Date(Number(block.timestamp) * 1000).toISOString(),
     from: wallet.account.address, to: environment.DelegationManager, gasLimit: Number(GAS_LIMIT), gasUsed: Number(rc.gasUsed),
     delegationHash: hashDelegation(signed), blockedBy: enforcer.by, blockedByAddress: enforcer.address,
-    simulatedRevertReason: simulatedRevert, simulatedRevertData, limitedCallsCountBefore: Number(countBefore), limitedCallsCountAfter: Number(countAfter),
+    simulatedRevertReason: sim.reason, simulatedRevertData: sim.data, limitedCallsCountBefore: Number(countBefore), limitedCallsCountAfter: Number(countAfter),
+    replayAtParentBlock: { block: mined.replayBlock, method: 'eth_call with the mined tx from/to/input/gas', revertData: mined.replayRevertData, decoded: mined.replayDecoded },
   };
-  console.log(label, hash, rc.status, simulatedRevert);
+  console.log(label, hash, rc.status, sim.reason);
   return r;
 }
 
 const agentBefore = await publicClient.getBalance({ address: agent });
-const R1 = await revertingTx('R1 agent redeems the fresh delegation itself (skips the clerk)', agentWallet, fresh, { by: 'DelegationManager (InvalidDelegate: caller is not the delegate)', address: environment.DelegationManager });
-const R2 = await revertingTx('R2 clerk redeems the already-paid live-run delegation a second time', clerkWallet, spent.signed, { by: 'NativeTokenTransferAmountEnforcer (allowance-exceeded)', address: environment.caveatEnforcers.NativeTokenTransferAmountEnforcer });
+const R1 = await revertingTx('R1 agent redeems the fresh delegation itself (skips the clerk)', 'R1', agentWallet, fresh, { by: 'DelegationManager (InvalidDelegate: caller is not the delegate)', address: environment.DelegationManager });
+const R2 = await revertingTx('R2 clerk redeems the already-paid live-run delegation a second time', 'R2', clerkWallet, spent.signed, { by: 'NativeTokenTransferAmountEnforcer (allowance-exceeded)', address: environment.caveatEnforcers.NativeTokenTransferAmountEnforcer });
 const agentAfter = await publicClient.getBalance({ address: agent });
 out.transactions = { R1_outsiderRedeem: R1, R2_secondRedeem: R2 };
 out.balancesAfter = { clerkEth: await bal(clerk.address), agentEth: formatEther(agentAfter), principalSmartAccountEth: await bal(principal.address) };
@@ -155,6 +211,7 @@ out.checks = {
   spentDelegationCallCount: R2.limitedCallsCountAfter,
   freshDelegationCallCount: R1.limitedCallsCountAfter,
 };
+if (!out.checks.bothReverted) fail(new GateError('not every transaction reverted'));
 out.finishedAtUtc = new Date().toISOString();
-writeFileSync(new URL('../live-refusal-result.json', import.meta.url), bigintJson(out) + '\n');
-console.log('wrote live-refusal-result.json', bigintJson(out.checks));
+writeFileSync(outPath, bigintJson(out) + '\n', { flag: 'wx' }); // 'wx': never overwrite
+console.log(`wrote ${outPath}`, bigintJson(out.checks));

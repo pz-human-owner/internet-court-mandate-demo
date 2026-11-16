@@ -73,3 +73,31 @@ test('the record states what it does not show', () => {
   assert.ok(r.whatThisDoesNotShow.some((s) => /FALSE or UNDETERMINED/.test(s)));
   assert.ok(r.whatThisDoesNotShow.some((s) => /clerk/.test(s)));
 });
+
+test('gas note claims no cause; principal held 0 ETH during R1', () => {
+  assert.match(r.gasNote, /cause not traced/);
+  assert.doesNotMatch(r.gasNote, /calldata cost/);
+  assert.equal(r.balancesBefore.principalSmartAccountEth, '0');
+  assert.equal(r.balancesAfter.principalSmartAccountEth, '0');
+  assert.ok(r.whatThisShows.some((s) => /held 0 ETH .*not a funded payment being blocked/.test(s)));
+});
+
+test('independent read-only re-verification of R1 and R2 matches the record', () => {
+  const v = r.independentReverification;
+  assert.equal(v.passed, true);
+  for (const [step, key, reason] of [['R1', 'R1_outsiderRedeem', 'InvalidDelegate'], ['R2', 'R2_secondRedeem', 'NativeTokenTransferAmountEnforcer:allowance-exceeded']]) {
+    const x = v.transactions[step]; const t = r.transactions[key];
+    assert.equal(x.hash, t.hash);
+    assert.equal(getAddress(x.from), getAddress(t.from));
+    assert.equal(x.receiptStatus, 'reverted');
+    assert.equal(x.block, t.block);
+    assert.equal(x.replayBlock, t.block - 1);
+    assert.equal(x.gasUsed, t.gasUsed);
+    assert.equal(x.valueWei, '0');
+    assert.equal(decode(x.replayRevertData), reason);
+    assert.equal(x.replayDecoded, reason);
+    assert.equal(BigInt(x.feePaidWei), BigInt(x.gasUsed) * BigInt(x.effectiveGasPriceWei));
+  }
+  // R1 fee was paid by the agent; matches the agent's recorded balance change.
+  assert.equal(-BigInt(v.transactions.R1.feePaidWei), BigInt(r.checks.agentNetChangeWei));
+});
