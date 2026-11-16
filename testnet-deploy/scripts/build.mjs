@@ -1,7 +1,7 @@
 // Bundles src/app.mjs (+ genlayer-js) into dist/app.js and copies the contract and sample
-// case next to it, so the page is fully self-contained (no CDN scripts).
+// case (and the proof/ receipts) next to it, so the page is fully self-contained (no CDN scripts).
 import { build } from 'esbuild';
-import { mkdir, copyFile } from 'node:fs/promises';
+import { mkdir, copyFile, cp } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,4 +14,6 @@ await copyFile(join(here, 'index.html'), join(dist, 'index.html'));
 await copyFile(join(demo, 'contracts/MandateVerdict.py'), join(dist, 'MandateVerdict.py'));
 await copyFile(join(demo, 'examples/sample_mandate.json'), join(dist, 'sample_mandate.json'));
 await copyFile(join(demo, 'examples/sample_deliverables.json'), join(dist, 'sample_deliverables.json'));
+// Dated proof receipts, used by the live view's fallback links.
+await cp(join(demo, 'proof'), join(dist, 'proof'), { recursive: true });
 console.log('Built', dist);

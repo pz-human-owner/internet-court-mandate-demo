@@ -1,6 +1,18 @@
-# Bradbury deploy page
+# Demo page: live verdict + optional Bradbury deploy
 
-A local page that deploys `contracts/MandateVerdict.py` to **GenLayer Testnet Bradbury (Phase 2)** and runs one verdict. Every transaction is signed in the browser with MetaMask through `window.ethereum`. The page never sees or asks for a seed phrase or private key.
+The page in this folder has two parts:
+
+1. **View the live verdict (default, no wallet).** On load it creates a read-only `genlayer-js` client (no account, no provider) for **GenLayer Testnet Bradbury (Phase 2)** and calls the contract's read-only views `get_status`, `get_verdict`, and `get_case` on the deployed sample case, [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B). It renders the mandate, deliverable, verdict, reasoning, supporting quote, and explorer links. No transaction is sent and MetaMask is not needed.
+2. **Try it with MetaMask (optional, collapsed).** Deploys `contracts/MandateVerdict.py` from the visitor's own wallet and runs one verdict. Every transaction is signed in the browser with MetaMask through `window.ethereum`. These are real Bradbury testnet transactions. The page never sees or asks for a seed phrase or private key.
+
+Hosted at **https://pz-human-owner.github.io/internet-court-mandate-demo/** once GitHub Pages is enabled for the repository (Settings → Pages → Source: GitHub Actions). The workflow [`../.github/workflows/pages.yml`](../.github/workflows/pages.yml) then runs `npm ci`, `npm test`, and `npm run build` here on every push to `main` and publishes `dist/`. Until Pages is enabled, run it locally (below).
+
+### View mode details
+
+- Reads go to the GenLayer node RPC `https://rpc-bradbury.genlayer.com` (it sends `Access-Control-Allow-Origin: *`, so the hosted page can call it directly). Each read times out after 30 seconds.
+- `?contract=0x…` in the page URL reads a different MandateVerdict contract instead of the sample case. A malformed value is ignored.
+- If the live read fails, the page says so in a yellow banner and shows the **recorded** result of the sample run (verdict, consensus, reasoning, quote) with explorer links and the dated receipts from [`../proof/`](../proof/), which the build copies into `dist/proof/`. That fallback is labelled as not live.
+- **Re-read live** repeats the three reads.
 
 For the full description of the contract, architecture, on-chain proof, and limitations, see the [root README](../README.md).
 
@@ -24,11 +36,11 @@ This page pins `genlayer-js@2.0.0-rc.3`, which points at ConsensusMain `0x2E2766
 
 ```bash
 npm ci && npm run build      # bundles genlayer-js into dist/app.js; no CDN
-npm test                     # network-free unit tests of the guards
+npm test                     # network-free unit tests of the guards and live-view helpers
 npm run serve                # http://127.0.0.1:8787/ (loopback only)
 ```
 
-Open the page in the browser that has MetaMask. The page sends three transactions, each at most once, in order, each behind a confirm dialog and a MetaMask prompt:
+The live verdict appears without a wallet. For the optional deploy, open the page in the browser that has MetaMask and expand **Optional: try it with MetaMask**. That section sends three transactions, each at most once, in order, each behind a confirm dialog and a MetaMask prompt:
 
 1. **Deploy** `MandateVerdict(agent = your address, mandate, guidelines, evidence_url, allow_subpaths = false)` using the sample case in `../examples`. You become the principal.
 2. **`submit_deliverable`** with the sample "pass" deliverable. The contract only accepts this from the appointed agent, so with one wallet the agent is your own address.
