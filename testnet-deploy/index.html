@@ -2,21 +2,46 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Internet Court · MandateVerdict · Bradbury testnet deploy (MetaMask)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Internet Court · MandateVerdict · live verdict on GenLayer Testnet Bradbury</title>
 <style>
  body{font:14px/1.45 system-ui,sans-serif;max-width:960px;margin:24px auto;padding:0 16px;color:#111}
- h1{font-size:20px} fieldset{margin:12px 0;border:1px solid #ccc;border-radius:6px}
+ h1{font-size:20px} h2{font-size:17px;margin-top:28px} fieldset{margin:12px 0;border:1px solid #ccc;border-radius:6px}
  textarea,input{width:100%;box-sizing:border-box;font:12px monospace} textarea{height:70px}
  button{margin:4px 8px 4px 0;padding:6px 12px} button:disabled{opacity:.45}
  #log{background:#111;color:#cfc;white-space:pre-wrap;height:320px;overflow:auto;padding:8px;font:12px monospace}
  .warn{background:#fff4d6;border:1px solid #e0b100;padding:8px;border-radius:6px}
- code{background:#f2f2f2;padding:0 3px}
+ .note{background:#eef4ff;border:1px solid #9bb7e8;padding:8px;border-radius:6px}
+ .verdict{font-size:22px;font-weight:700}
+ dl.case{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px} dl.case dt{font-weight:600} dl.case dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+ blockquote{margin:0;padding:4px 10px;border-left:3px solid #9bb7e8;background:#f7f9fc}
+ code{background:#f2f2f2;padding:0 3px;overflow-wrap:anywhere}
+ details>summary{cursor:pointer;font-weight:600;font-size:17px;margin-top:28px}
 </style>
 </head>
 <body>
-<h1>MandateVerdict → GenLayer Testnet Bradbury (Phase 2), signed in MetaMask</h1>
-<p class="warn">Sends real <b>testnet</b> transactions only after you click a step and accept the confirm dialog and the MetaMask prompt.
-Three transactions in total: deploy, submit_deliverable, request_verdict. Never type a seed phrase or private key anywhere on this page; it never asks for one.</p>
+<h1>Internet Court · MandateVerdict on GenLayer Testnet Bradbury</h1>
+<p>A principal wrote a mandate and bound the evidence page a jury may read. An agent submitted a deliverable. GenLayer validators fetched the page and recorded a verdict on chain. This page reads that verdict straight from the contract. No wallet needed.</p>
+
+<h2>View the live verdict</h2>
+<p class="note" id="v-mode">Reading the contract on Bradbury (read-only <code>gen_call</code>: get_status, get_verdict, get_case)…</p>
+<button id="v-refresh">Re-read live</button>
+<dl class="case">
+ <dt>Contract</dt><dd id="v-contract">–</dd>
+ <dt>Status</dt><dd id="v-status">–</dd>
+ <dt>Verdict</dt><dd><span class="verdict" id="v-verdict">–</span></dd>
+ <dt>Reasoning</dt><dd id="v-reasoning">–</dd>
+ <dt>Supporting quote</dt><dd><blockquote id="v-quote">–</blockquote></dd>
+ <dt>Evidence page</dt><dd id="v-source">–</dd>
+ <dt>Mandate</dt><dd id="v-mandate">–</dd>
+ <dt>Deliverable</dt><dd id="v-deliverable">–</dd>
+ <dt>Read at</dt><dd id="v-time">–</dd>
+</dl>
+<div id="v-recorded"></div>
+
+<details id="mm">
+<summary>Optional: try it with MetaMask (sends real testnet transactions)</summary>
+<p class="warn"><b>Optional, and not needed to see the verdict above.</b> This section deploys your own copy of the contract from <b>your own</b> MetaMask wallet and sends three <b>real GenLayer Testnet Bradbury</b> transactions (deploy, submit_deliverable, request_verdict). Each needs testnet GEN from the faucet, a click, a confirm dialog that shows a freshly estimated fee deposit, and a MetaMask prompt. Never type a seed phrase or private key anywhere on this page; it never asks for one.</p>
 
 <fieldset><legend>1 · Wallet and network</legend>
  <button id="connect">Connect MetaMask</button>
@@ -43,8 +68,10 @@ Three transactions in total: deploy, submit_deliverable, request_verdict. Never 
  <div>Contract: <span id="contract">–</span></div>
  <div>Verdict: <code id="result">–</code></div>
 </fieldset>
+</details>
 
 <pre id="log"></pre>
+<p><a href="https://github.com/pz-human-owner/internet-court-mandate-demo">Source on GitHub</a> · Explorer: <a href="https://scan.testnet-chain.genlayer.com">scan.testnet-chain.genlayer.com</a></p>
 <script type="module" src="./app.js"></script>
 </body>
 </html>

@@ -1,12 +1,16 @@
-// Browser page: deploy MandateVerdict to GenLayer Testnet Bradbury (Phase 2) and run one
-// verdict, signing every transaction in the user's own MetaMask (window.ethereum).
-// No private key ever reaches this page. Every send needs a click plus a confirm dialog.
+// Browser page for MandateVerdict on GenLayer Testnet Bradbury (Phase 2).
+// 1) Live view (default, no wallet): reads the deployed sample case with read-only
+//    gen_call views and renders the verdict. Falls back to the recorded run if the RPC fails.
+// 2) Optional MetaMask flow: deploy your own copy and run one verdict, signing every
+//    transaction in the visitor's own MetaMask (window.ethereum). No private key ever
+//    reaches this page. Every send needs a click plus a confirm dialog with a fresh fee estimate.
 import { createClient, isSuccessful } from 'genlayer-js';
 import { testnetBradbury } from 'genlayer-js/chains';
 import {
   BRADBURY, addChainParams, assertBradburyChain, assertGenesis, constructorArgs,
   createStepGate, formatGen, evmReceiptCost, explorerTx, explorerAddress,
   liveFeesOrAbort, sendConfirmText, shouldUnlockAfterEstimate,
+  viewContractAddress, parseVerdict, parseCase, RECORDED_RUN, recordedTxLinks, withTimeout,
 } from './plan.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -204,3 +208,108 @@ wire('verdict', verdict);
 wire('read', readVerdict);
 { const rc = new URLSearchParams(location.search).get('contract'); if (rc && /^0x[0-9a-fA-F]{40}$/.test(rc)) { state.resumeContract = rc; $('contract').textContent = rc + ' (resume)'; } }
 loadInputs().catch((e) => log('Could not load contract/sample files: ' + e.message));
+
+// ---------------------------------------------------------------------------
+// Live view: read-only client, no account, no provider. Only gen_call views.
+// ---------------------------------------------------------------------------
+const VIEW_TIMEOUT_MS = 30000;
+const view = { busy: false };
+
+function setText(id, v) { $(id).textContent = v == null || v === '' ? '–' : String(v); }
+
+function link(href, text) {
+  const a = document.createElement('a');
+  a.href = href; a.target = '_blank'; a.rel = 'noopener'; a.textContent = text;
+  return a;
+}
+
+function renderContract(address) {
+  const el = $('v-contract');
+  el.replaceChildren(link(explorerAddress(address), address), document.createTextNode(' (explorer)'));
+}
+
+function renderSource(url) {
+  const el = $('v-source');
+  if (url && url.startsWith('https://')) el.replaceChildren(link(url, url)); else setText('v-source', url);
+}
+
+function renderTxLinks(container) {
+  const ul = document.createElement('ul');
+  for (const t of recordedTxLinks()) {
+    const li = document.createElement('li');
+    li.append(`${t.step}: `, link(t.explorer, t.evmHash.slice(0, 18) + '…'), ' · ', link(`./proof/eth/${t.proof}`, 'EVM receipt'), ' · ', link(`./proof/gen/${t.proof}`, 'GenLayer receipt'));
+    ul.append(li);
+  }
+  container.append(ul);
+}
+
+async function viewLive() {
+  if (view.busy) return;
+  view.busy = true;
+  const { address, isDefault } = viewContractAddress(location.search);
+  renderContract(address);
+  $('v-recorded').replaceChildren();
+  $('v-mode').className = 'note';
+  $('v-mode').textContent = `Reading ${isDefault ? 'the sample case' : 'contract ' + address} on Bradbury (read-only gen_call: get_status, get_verdict, get_case)…`;
+  try {
+    const reader = createClient({ chain: testnetBradbury, endpoint: BRADBURY.defaultGenlayerRpcUrl });
+    const read = (functionName) => withTimeout(reader.readContract({ address, functionName, args: [] }), VIEW_TIMEOUT_MS, functionName);
+    const [status, rawVerdict, rawCase] = await Promise.all([read('get_status'), read('get_verdict'), read('get_case')]);
+    const v = parseVerdict(rawVerdict);
+    const c = parseCase(rawCase);
+    setText('v-status', status);
+    setText('v-verdict', v.verdict || (v.last_error ? `no verdict yet (${v.last_error})` : 'no verdict yet'));
+    setText('v-reasoning', v.reasoning);
+    setText('v-quote', v.quote);
+    renderSource(v.source_url || c.source_url);
+    setText('v-mandate', c.mandate);
+    setText('v-deliverable', c.deliverable);
+    setText('v-time', `${new Date().toLocaleString()} (your local time)`);
+    $('v-mode').textContent = `Live: read just now from ${address} on GenLayer Testnet Bradbury via ${BRADBURY.defaultGenlayerRpcUrl}. Read-only, no wallet, no transaction.`;
+    if (isDefault) {
+      const p = document.createElement('p');
+      p.textContent = 'The three transactions that produced this verdict (Nov 15, 2026):';
+      $('v-recorded').append(p);
+      renderTxLinks($('v-recorded'));
+    }
+    log('Live view: get_verdict (read-only gen_call)', v);
+  } catch (e) {
+    showRecorded(address, isDefault, e);
+  } finally {
+    view.busy = false;
+  }
+}
+
+async function showRecorded(address, isDefault, err) {
+  const why = (err && (err.shortMessage || err.message)) || String(err);
+  log('Live view: read failed, showing the recorded run', why);
+  $('v-mode').className = 'warn';
+  if (!isDefault) {
+    $('v-mode').textContent = `Live read of ${address} failed (${why}). No recorded snapshot exists for this address; check it on the explorer or press Re-read live.`;
+    return;
+  }
+  $('v-mode').textContent = `Live read failed (${why}). Showing the recorded result of the sample run instead. It is not a live read; press Re-read live to try again, or verify on the explorer.`;
+  const r = RECORDED_RUN;
+  renderContract(r.contract);
+  setText('v-status', `${r.status} (recorded)`);
+  setText('v-verdict', `${r.verdict} · ${r.consensus}`);
+  setText('v-reasoning', r.reasoning);
+  setText('v-quote', r.quote);
+  renderSource(r.source_url);
+  setText('v-mandate', 'Not in the snapshot; see examples/sample_mandate.json in the repository.');
+  setText('v-deliverable', 'Not in the snapshot; see examples/sample_deliverables.json ("pass").');
+  setText('v-time', `Receipts captured ${r.capturedEt}`);
+  const p = document.createElement('p');
+  p.textContent = 'Recorded transactions, with the dated RPC receipts from the repository\'s proof/ folder:';
+  $('v-recorded').replaceChildren(p);
+  renderTxLinks($('v-recorded'));
+  try {
+    const g = await (await fetch('./proof/gen/request_verdict.json')).json();
+    const s = document.createElement('p');
+    s.textContent = `Snapshot of request_verdict: ${g.result.statusName} / ${g.result.txExecutionResultName}.`;
+    $('v-recorded').append(s);
+  } catch { /* snapshot files are optional in the page */ }
+}
+
+$('v-refresh').addEventListener('click', () => { viewLive(); });
+viewLive();

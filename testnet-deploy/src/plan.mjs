@@ -1,4 +1,4 @@
-// Pure, network-free helpers for the testnet deploy page.
+// Pure, network-free helpers for the demo page (read-only live view + optional MetaMask deploy).
 // Everything that decides WHAT gets sent lives here so it can be unit tested
 // without a wallet or an RPC. Sources for every constant are listed in README.md.
 
@@ -145,3 +145,94 @@ export function shouldUnlockAfterEstimate(alreadyEstimated) {
 
 export function explorerTx(hash, net = BRADBURY) { return `${net.explorerUrl}/tx/${hash}`; }
 export function explorerAddress(addr, net = BRADBURY) { return `${net.explorerUrl}/address/${addr}`; }
+
+// ---------------------------------------------------------------------------
+// Read-only live view (no wallet). The page reads the already-deployed sample
+// case with gen_call views only: get_status, get_verdict, get_case.
+// ---------------------------------------------------------------------------
+
+/** The sample case deployed on Bradbury (chain 4221) on Nov 15, 2026. See ../proof/. */
+export const DEFAULT_CONTRACT = '0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B';
+
+/** The read-only views the live view calls. None of them sends a transaction. */
+export const VIEW_FUNCTIONS = Object.freeze(['get_status', 'get_verdict', 'get_case']);
+
+export function isAddress(v) {
+  return typeof v === 'string' && /^0x[0-9a-fA-F]{40}$/.test(v);
+}
+
+/**
+ * Which contract the live view reads: a valid ?contract=0x... in the page URL,
+ * otherwise DEFAULT_CONTRACT. Anything malformed falls back to the default.
+ */
+export function viewContractAddress(search = '', fallback = DEFAULT_CONTRACT) {
+  let q = null;
+  try { q = new URLSearchParams(search).get('contract'); } catch { q = null; }
+  if (isAddress(q)) return { address: q, isDefault: sameHex(q, fallback) };
+  return { address: fallback, isDefault: true };
+}
+
+function parseJsonObject(raw, what) {
+  let o = raw;
+  if (typeof raw === 'string') {
+    try { o = JSON.parse(raw); } catch { throw new Error(`${what} did not return JSON`); }
+  }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) throw new Error(`${what} did not return an object`);
+  return o;
+}
+
+const str = (v) => (v == null ? '' : String(v));
+
+/** Normalize the JSON string returned by get_verdict. */
+export function parseVerdict(raw) {
+  const o = parseJsonObject(raw, 'get_verdict');
+  return {
+    status: str(o.status), verdict: str(o.verdict), reasoning: str(o.reasoning), quote: str(o.quote),
+    source_url: str(o.source_url), last_error: str(o.last_error), attempts: Number(o.attempts ?? 0),
+  };
+}
+
+/** Normalize the JSON string returned by get_case. */
+export function parseCase(raw) {
+  const o = parseJsonObject(raw, 'get_case');
+  return {
+    principal: str(o.principal), agent: str(o.agent), mandate: str(o.mandate), guidelines: str(o.guidelines),
+    evidence_url: str(o.evidence_url), allow_subpaths: o.allow_subpaths === true, status: str(o.status),
+    deliverable: str(o.deliverable), source_url: str(o.source_url), verdict: str(o.verdict),
+    reasoning: str(o.reasoning), quote: str(o.quote), last_error: str(o.last_error), attempts: Number(o.attempts ?? 0),
+  };
+}
+
+/**
+ * Recorded result of the sample Bradbury run, shown only when the live read fails.
+ * Transaction hashes and capture time: ../proof/README.md. Verdict and consensus:
+ * root README. Reasoning and quote: get_verdict as read from DEFAULT_CONTRACT on
+ * Nov 16, 2026 (the case is resolved, so these no longer change).
+ */
+export const RECORDED_RUN = Object.freeze({
+  contract: DEFAULT_CONTRACT,
+  capturedEt: 'Sunday, Nov 15, 2026, 10:37:56 PM ET',
+  status: 'resolved',
+  verdict: 'TRUE',
+  consensus: 'MAJORITY_AGREE 4/5 (5 validators; 4 Agree, 1 Timeout)',
+  reasoning: 'The deliverable accurately reflects the page: it mentions ERC-7710, states that the delegator configures a scope and optional caveats, and does not claim the delegate receives the private key. All mandate clauses are satisfied.',
+  quote: 'The delegator creates a delegation, configuring a scope and optional caveats that define the conditions under which the delegation can be redeemed.',
+  source_url: 'https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/',
+  txs: Object.freeze([
+    Object.freeze({ step: 'deploy', evmHash: '0x5572f1d3140aa180df8dbe5df207ba1f9cbdff26c86651086b3e72b636509d09', proof: 'deploy.json' }),
+    Object.freeze({ step: 'submit_deliverable', evmHash: '0x778a69fe0b8ffb3e7a80879cef6ea25aa65bee4cd9992a7b3cbbfba61350a9e7', proof: 'submit_deliverable.json' }),
+    Object.freeze({ step: 'request_verdict', evmHash: '0x99f86115017d036dc1d2119ada7c8875cc79c5ef9532d705b9a352d764632e49', proof: 'request_verdict.json' }),
+  ]),
+});
+
+/** Explorer links for the recorded run (used by the fallback view). */
+export function recordedTxLinks(run = RECORDED_RUN, net = BRADBURY) {
+  return run.txs.map((t) => ({ step: t.step, evmHash: t.evmHash, explorer: explorerTx(t.evmHash, net), proof: t.proof }));
+}
+
+/** Reject after ms, so a hung RPC drops the page into the fallback view. */
+export function withTimeout(promise, ms, what = 'request') {
+  let timer;
+  const t = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${what} timed out after ${ms} ms`)), ms); });
+  return Promise.race([promise, t]).finally(() => clearTimeout(timer));
+}

@@ -4,6 +4,8 @@ import {
   BRADBURY, addChainParams, assertBradburyChain, assertGenesis, constructorArgs,
   createStepGate, formatGen, evmReceiptCost, PLANNED_STEPS,
   liveFeesOrAbort, sendConfirmText, shouldUnlockAfterEstimate,
+  DEFAULT_CONTRACT, VIEW_FUNCTIONS, isAddress, viewContractAddress, parseVerdict, parseCase,
+  RECORDED_RUN, recordedTxLinks, withTimeout, explorerAddress,
 } from '../src/plan.mjs';
 
 const ME = '0x1111111111111111111111111111111111111111';
@@ -76,3 +78,50 @@ test('send confirm text shows the live deposit; re-estimate does not unlock agai
   assert.equal(shouldUnlockAfterEstimate(true), false);
 });
 
+test('default contract is the deployed Bradbury sample case', () => {
+  assert.equal(DEFAULT_CONTRACT, '0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B');
+  assert.ok(isAddress(DEFAULT_CONTRACT));
+  assert.equal(explorerAddress(DEFAULT_CONTRACT), 'https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B');
+  assert.deepEqual([...VIEW_FUNCTIONS], ['get_status', 'get_verdict', 'get_case']);
+  assert.equal(RECORDED_RUN.contract, DEFAULT_CONTRACT);
+});
+
+test('viewContractAddress: ?contract= override, otherwise the default', () => {
+  assert.deepEqual(viewContractAddress(''), { address: DEFAULT_CONTRACT, isDefault: true });
+  assert.deepEqual(viewContractAddress('?contract=' + ME), { address: ME, isDefault: false });
+  assert.deepEqual(viewContractAddress('?contract=' + DEFAULT_CONTRACT.toLowerCase()), { address: DEFAULT_CONTRACT.toLowerCase(), isDefault: true });
+  for (const bad of ['?contract=0x123', '?contract=<script>', '?contract=', '?other=1', '?contract=' + ME + 'ff']) {
+    assert.deepEqual(viewContractAddress(bad), { address: DEFAULT_CONTRACT, isDefault: true }, bad);
+  }
+  assert.equal(isAddress(undefined), false);
+  assert.equal(isAddress('0x' + 'g'.repeat(40)), false);
+});
+
+test('parseVerdict / parseCase normalize the contract JSON views', () => {
+  const v = parseVerdict('{"status": "resolved", "verdict": "TRUE", "reasoning": "r", "quote": "q", "source_url": "https://x.io/", "last_error": "", "attempts": 1}');
+  assert.deepEqual(v, { status: 'resolved', verdict: 'TRUE', reasoning: 'r', quote: 'q', source_url: 'https://x.io/', last_error: '', attempts: 1 });
+  assert.equal(parseVerdict({ status: 'submitted' }).verdict, '');
+  assert.throws(() => parseVerdict('not json'), /did not return JSON/);
+  assert.throws(() => parseVerdict('[1]'), /did not return an object/);
+  const c = parseCase(JSON.stringify({ principal: ME, agent: ME, mandate: 'm', allow_subpaths: false, attempts: 2 }));
+  assert.equal(c.mandate, 'm');
+  assert.equal(c.allow_subpaths, false);
+  assert.equal(c.attempts, 2);
+  assert.equal(c.deliverable, '');
+});
+
+test('recorded run fallback matches the proof/ table', () => {
+  assert.equal(RECORDED_RUN.verdict, 'TRUE');
+  const links = recordedTxLinks();
+  assert.deepEqual(links.map((l) => l.step), ['deploy', 'submit_deliverable', 'request_verdict']);
+  for (const l of links) {
+    assert.match(l.evmHash, /^0x[0-9a-f]{64}$/);
+    assert.equal(l.explorer, `https://scan.testnet-chain.genlayer.com/tx/${l.evmHash}`);
+  }
+  assert.equal(links[0].evmHash, '0x5572f1d3140aa180df8dbe5df207ba1f9cbdff26c86651086b3e72b636509d09');
+});
+
+test('withTimeout rejects a hung read and passes a fast one through', async () => {
+  assert.equal(await withTimeout(Promise.resolve(7), 50), 7);
+  await assert.rejects(() => withTimeout(new Promise(() => {}), 20, 'get_verdict'), /get_verdict timed out after 20 ms/);
+});

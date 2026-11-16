@@ -6,6 +6,15 @@ The sample case binds official [MetaMask Smart Accounts Kit: Delegation](https:/
 
 MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project uses MetaMask's public documentation as evidence and MetaMask in the browser to sign testnet transactions. It is not endorsed by MetaMask.
 
+## Live demo
+
+Hosted page: **https://pz-human-owner.github.io/internet-court-mandate-demo/** (served by GitHub Pages from `testnet-deploy/` via [`.github/workflows/pages.yml`](.github/workflows/pages.yml); the link works only once GitHub Pages is enabled for this repository with Source: GitHub Actions).
+
+- **View the live verdict (default, no wallet).** On load the page reads the deployed sample case, contract [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B) on Bradbury, with read-only `gen_call` views (`get_status`, `get_verdict`, `get_case`) and shows the mandate, deliverable, verdict, reasoning, supporting quote, and explorer links. Nothing is signed or sent. If the RPC cannot be reached, the page says so and shows the recorded result of the Nov 15 run with links to the [`proof/`](proof/) receipts and the explorer. Add `?contract=0x…` to read a different MandateVerdict contract.
+- **Try it with MetaMask (optional).** A collapsed section deploys your own copy from your own MetaMask wallet. It sends real Bradbury testnet transactions and needs testnet GEN; see [Deploy on Bradbury](#deploy-on-bradbury).
+
+To run the same page locally: `cd testnet-deploy && npm ci && npm run build && npm run serve`, then open http://127.0.0.1:8787/.
+
 ## What it does
 
 1. A **principal** creates the case: a written **mandate**, **guidelines**, and the **evidence URL** the jury may read. The binding is either an exact URL or, with `allow_subpaths=True`, an origin plus a path prefix.
@@ -54,9 +63,10 @@ These rules are in `contracts/MandateVerdict.py` (`_normalize_ws`, `_quote_in_pa
 |---|---|
 | `contracts/MandateVerdict.py` | The Intelligent Contract. Pinned to the Bradbury runner `py-genlayer:babwp9t37jw9g4j2bccgn14g6x7x9s1f7dsmh7emvz735pz4zxa0` and written against the current GenLayer Python API (`import genlayer as gl`, `gl.contract.Contract`, `gl.vm.run_nondet`). |
 | `examples/` | Sample mandate (with the bound evidence URL) and pass / fail / undetermined deliverables. |
-| `testnet-deploy/` | Local page that deploys to Bradbury and runs one case. Every transaction is signed in the browser with MetaMask. |
+| `testnet-deploy/` | The demo page. By default it reads the live verdict of the deployed sample case without a wallet; an optional section deploys to Bradbury and runs one case, with every transaction signed in the browser with MetaMask. |
 | `tests/direct/` | Optional in-memory tests of the contract file via `genlayer-test`. |
-| `proof/` | Dated raw JSON-RPC receipts for the sample Bradbury run, with commands to reproduce. |
+| `proof/` | Dated raw JSON-RPC receipts for the sample Bradbury run, with commands to reproduce. Also copied into the page build for its fallback view. |
+| `.github/workflows/pages.yml` | On push to `main`: `npm ci`, `npm test`, `npm run build` in `testnet-deploy/`, then publishes `testnet-deploy/dist` to GitHub Pages. Uses only the built-in `GITHUB_TOKEN`. |
 
 The contract holds one case. The deployer is the principal. `submit_deliverable` is restricted to the appointed agent. `request_verdict` may be called by either party once a deliverable is on file. `get_verdict` is a read-only view.
 
@@ -90,8 +100,8 @@ Node 20+ for the deploy-page tests and bundle:
 ```bash
 cd testnet-deploy
 npm ci
-npm test          # network-free unit tests of chain, genesis, and send guards
-npm run build     # writes dist/ (bundled app, contract, and sample case)
+npm test          # network-free unit tests of chain, genesis, send guards, and live-view helpers
+npm run build     # writes dist/ (bundled app, contract, sample case, proof/ receipts)
 ```
 
 Optional contract tests (Python 3.11+). These use a local GenVM stand-in, not the live network:
@@ -124,7 +134,7 @@ npm ci && npm run build
 npm run serve                 # http://127.0.0.1:8787/ (loopback only)
 ```
 
-Open the page in a browser with MetaMask. Add or switch to Bradbury, connect, run the read-only fee estimate, then confirm each of the three transactions (deploy, `submit_deliverable`, `request_verdict`). Each send is gated by an in-page confirm dialog and a MetaMask prompt. The page never asks for a seed phrase or private key.
+Open the page in a browser with MetaMask and expand **Optional: try it with MetaMask**. Add or switch to Bradbury, connect, run the read-only fee estimate, then confirm each of the three transactions (deploy, `submit_deliverable`, `request_verdict`). Each send is gated by an in-page confirm dialog and a MetaMask prompt. The page never asks for a seed phrase or private key.
 
 You need testnet GEN from the faucet. With one connected account, the principal and the agent are the same address. That is enough to show the mechanics; it is not a two-party run.
 
