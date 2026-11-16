@@ -7,7 +7,7 @@ A principal writes a mandate, binds the evidence a jury may read, and appoints a
 
 The sample case binds official [MetaMask Smart Accounts Kit: Delegation](https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/) documentation (HTTP 200, no redirect, checked 15 November 2026). The mandate asks for a short briefing that mentions ERC-7710, explains that the delegator configures a scope and optional caveats, and never claims that the delegate holds the delegator's private key.
 
-**How MetaMask fits in, plainly:** two ways. (1) The jury reads MetaMask's official delegation documentation as its evidence, and MetaMask is the optional browser signer if you deploy your own copy of the contract. (2) [`partner/metamask/`](partner/metamask/) settles the case with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/): the principal's MetaMask smart account signs an ERC-7710 delegation that can pay the agent a fixed fee once, and a settlement script redeems it only after the GenLayer contract returns TRUE. The delegation's limits are enforced on-chain by MetaMask's Delegation Framework; the verdict check is done by that script, not by a contract (see [MetaMask delegation settlement](#metamask-delegation-settlement)). So far that flow has run end to end on a local fork of Ethereum Sepolia against the real Bradbury verdict; it has not yet been run on a public testnet. MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project is not endorsed by MetaMask.
+**How MetaMask fits in, plainly:** two ways. (1) The jury reads MetaMask's official delegation documentation as its evidence, and MetaMask is the optional browser signer if you deploy your own copy of the contract. (2) [`partner/metamask/`](partner/metamask/) settles the case with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/): the principal's MetaMask smart account signs an ERC-7710 delegation that can pay the agent a fixed fee once, and a settlement script redeems it only after the GenLayer contract returns TRUE. The delegation's limits are enforced on-chain by MetaMask's Delegation Framework; the verdict check is done by that script, not by a contract (see [MetaMask delegation settlement](#metamask-delegation-settlement)). That flow has run live on Ethereum Sepolia against the real Bradbury verdict: the [redeem transaction](https://sepolia.etherscan.io/tx/0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f) paid the agent 0.001 ETH. MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project is not endorsed by MetaMask.
 
 ## Live demo
 
@@ -83,7 +83,20 @@ These rules are in `contracts/MandateVerdict.py` (`_normalize_ws`, `_quote_in_pa
 - checks that a mocked FALSE verdict is refused without sending anything
 - checks that an outsider's redemption, a second redemption, and a redemption after expiry all revert on-chain
 
-The recorded output is in [`partner/metamask/sim-result.json`](partner/metamask/sim-result.json). A public Sepolia run (three transactions; `node scripts/live.mjs plan` lists them) has not been done yet.
+The recorded output is in [`partner/metamask/sim-result.json`](partner/metamask/sim-result.json).
+
+### Live run on Sepolia
+
+On 16 November 2026 (20:38–20:39 UTC) the flow ran on public Ethereum Sepolia with throwaway testnet keys. The clerk read the real Bradbury verdict for [`0x07E2…2F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B), got `resolved` / **TRUE**, and redeemed the delegation. The full record, with hashes, blocks, addresses, the delegation hash and caveat enforcers, is in [`partner/metamask/live-result.json`](partner/metamask/live-result.json).
+
+| Step | Transaction | Block | Result |
+|---|---|---|---|
+| A. Deploy the principal's MetaMask Hybrid smart account [`0x2d00…C976`](https://sepolia.etherscan.io/address/0x2d006AF0f603CA2C2a6b8f9689A20E1dc65FC976) via SimpleFactory | [`0x0897bcff…`](https://sepolia.etherscan.io/tx/0x0897bcffcc2afd00de69936ab89de6613c4fc1bccb8b2b4130c4092ea79ca51a) | 12149738 | success |
+| B. Fund the smart account with the 0.001 ETH fee | [`0xef5104a4…`](https://sepolia.etherscan.io/tx/0xef5104a490e68ae7078b396beaab9080922301fdf2caad69da0aed27218881c3) | 12149739 | success |
+| – Owner signs the ERC-7710 delegation off-chain (hash `0xd76ec7fb…8187`) | no transaction | – | – |
+| C. The clerk [`0x906b…2D10`](https://sepolia.etherscan.io/address/0x906b4D9d64a5d4Bb559292A3f24562835a122D10) reads verdict TRUE and calls `DelegationManager.redeemDelegations` | [`0x64a3f537…`](https://sepolia.etherscan.io/tx/0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f) | 12149741 | success; agent [`0x8b5d…4929`](https://sepolia.etherscan.io/address/0x8b5deeE4A52c321C81C33b2bC99834EB05B04929) went from 0 to 0.001 ETH |
+
+The FALSE path and the on-chain rejections (an outsider, a second redemption, a redemption after expiry) were exercised only in the local fork simulation, not on public Sepolia.
 
 ## Architecture
 
