@@ -9,7 +9,14 @@
     "contract": "0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B",
     "readMethod": "get_verdict (read-only gen_call)",
     "status": "resolved",
-    "verdict": "TRUE"
+    "verdict": "TRUE",
+    "rawGetVerdict": {
+      "note": "Raw get_verdict response from a separate read-only gen_call made after the live run (no transaction). The settle-time read at 2026-11-16T20:39Z returned status resolved / verdict TRUE, as recorded above; its raw text was not saved.",
+      "endpoint": "https://rpc-bradbury.genlayer.com",
+      "requestedAtUtc": "2026-11-16T21:10:51.728Z",
+      "receivedAtUtc": "2026-11-16T21:10:58.313Z",
+      "response": "{\"status\": \"resolved\", \"verdict\": \"TRUE\", \"reasoning\": \"The deliverable accurately reflects the page: it mentions ERC-7710, states that the delegator configures a scope and optional caveats, and does not claim the delegate receives the private key. All mandate clauses are satisfied.\", \"quote\": \"The delegator creates a delegation, configuring a scope and optional caveats that define the conditions under which the delegation can be redeemed.\", \"source_url\": \"https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/\", \"last_error\": \"\", \"attempts\": 1}"
+    }
   },
   "accounts": {
     "owner": "0xF7EA5cC74Cd44c5EA35c0285bC44eB76A7c20bF4",
