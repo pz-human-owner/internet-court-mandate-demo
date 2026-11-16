@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Internet Court · MandateVerdict · Bradbury testnet deploy (MetaMask)</title>
+<style>
+ body{font:14px/1.45 system-ui,sans-serif;max-width:960px;margin:24px auto;padding:0 16px;color:#111}
+ h1{font-size:20px} fieldset{margin:12px 0;border:1px solid #ccc;border-radius:6px}
+ textarea,input{width:100%;box-sizing:border-box;font:12px monospace} textarea{height:70px}
+ button{margin:4px 8px 4px 0;padding:6px 12px} button:disabled{opacity:.45}
+ #log{background:#111;color:#cfc;white-space:pre-wrap;height:320px;overflow:auto;padding:8px;font:12px monospace}
+ .warn{background:#fff4d6;border:1px solid #e0b100;padding:8px;border-radius:6px}
+ code{background:#f2f2f2;padding:0 3px}
+</style>
+</head>
+<body>
+<h1>MandateVerdict → GenLayer Testnet Bradbury (Phase 2), signed in MetaMask</h1>
+<p class="warn">Sends real <b>testnet</b> transactions only after you click a step and accept the confirm dialog and the MetaMask prompt.
+Three transactions in total: deploy, submit_deliverable, request_verdict. Never type a seed phrase or private key anywhere on this page; it never asks for one.</p>
+
+<fieldset><legend>1 · Wallet and network</legend>
+ <button id="connect">Connect MetaMask</button>
+ <button id="switch">Add / switch to Bradbury (4221)</button>
+ <div>Account: <code id="addr">–</code> · Wallet chain: <code id="walletchain">–</code> · Balance: <code id="balance">–</code></div>
+ <div>Chain RPC (MetaMask, eth_*): <code id="chainrpc"></code></div>
+ <label>GenLayer node RPC (gen_* reads and receipts) <input id="glrpc"></label>
+</fieldset>
+
+<fieldset><legend>2 · Case (sample from ../examples, editable)</legend>
+ <label>Mandate<textarea id="mandate"></textarea></label>
+ <label>Guidelines<textarea id="guidelines"></textarea></label>
+ <label>Evidence URL (principal-bound, allow_subpaths = false)<input id="evidence"></label>
+ <label>Deliverable (agent)<textarea id="deliverable"></textarea></label>
+ <label>Source URL (agent)<input id="source"></label>
+</fieldset>
+
+<fieldset><legend>3 · Transactions (each once, in order)</legend>
+ <button id="estimate" disabled>Estimate fee (read-only)</button> Deposit per tx: <code id="feeeach">–</code><br>
+ <button id="deploy" disabled>① Deploy</button>
+ <button id="submit" disabled>② submit_deliverable</button>
+ <button id="verdict" disabled>③ request_verdict</button>
+ <button id="read">Read verdict</button>
+ <div>Contract: <span id="contract">–</span></div>
+ <div>Verdict: <code id="result">–</code></div>
+</fieldset>
+
+<pre id="log"></pre>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

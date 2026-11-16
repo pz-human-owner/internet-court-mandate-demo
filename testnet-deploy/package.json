@@ -1,0 +1,19 @@
+{
+  "name": "internet-court-testnet-deploy-page",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local page that deploys MandateVerdict to GenLayer Testnet Bradbury (Phase 2) with a browser MetaMask signature.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "serve": "node scripts/serve.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "genlayer-js": "2.0.0-rc.3"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

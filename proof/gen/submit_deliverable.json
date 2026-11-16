@@ -1,0 +1,108 @@
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "id": "0xe8df70a207b432c69102d889817fa70a566916dba8aa0630b1935aad2712d3e5",
+    "txOrigin": "0x0f21f8a024dd2448a53e4763b23cc64ee939dfc4",
+    "sender": "0x0f21f8a024dd2448a53e4763b23cc64ee939dfc4",
+    "recipient": "0x07e2a9e0341266e87e539e8a18b9ed2611612f8b",
+    "activator": "0x9b925f790500ab245f0a7ce67eb21d951ed9a80d",
+    "status": 7,
+    "statusName": "Finalized",
+    "previousStatus": null,
+    "txSlot": 1,
+    "initialRotations": 3,
+    "numOfInitialValidators": 5,
+    "randomSeed": "0x4049586db6af388c1703354688801610f1bdd71795698a5548c1e3ac3bbe3ec2",
+    "txExecutionHash": "0xd0d9ad71f88b15766b0d08bc7523041f72f1ed4822a0abc63fe79f81fd831961",
+    "txCallData": "f901bcb901b8160094017375626d69745f64656c6976657261626c65046172677315fc14546865204d6574614d61736b20536d617274204163636f756e7473204b697420666f6c6c6f777320746865204552432d37373130207374616e6461726420666f7220736d61727420636f6e74726163742064656c65676174696f6e2e205468652064656c656761746f72206372656174657320612064656c65676174696f6e2c20636f6e6669677572696e6720612073636f706520616e64206f7074696f6e616c2063617665617473207468617420646566696e652074686520636f6e646974696f6e7320756e646572207768696368207468652064656c65676174696f6e2063616e2062652072656465656d65642e205468652064656c656761746f72207369676e73207468652064656c65676174696f6e2c20616e64207468652044656c65676174696f6e204d616e61676572206c617465722076616c6964617465732074686174207369676e61747572652ecc0468747470733a2f2f646f63732e6d6574616d61736b2e696f2f736d6172742d6163636f756e74732d6b69742f636f6e63657074732f64656c65676174696f6e2f6f766572766965772f00",
+    "eqBlocksOutputs": "0e076e645f6f75747305",
+    "timestamps": {
+      "Created": 1794797319,
+      "Pending": 1794797319,
+      "Activated": 1794797321,
+      "Proposed": 1794797331,
+      "Committed": 1794797340,
+      "LastVote": 1794797346,
+      "AppealSubmitted": 0,
+      "LeaderRevealed": 1794797342
+    },
+    "result": 1,
+    "txExecutionResult": 1,
+    "txExecutionResultName": "FinishedWithReturn",
+    "epoch": 25,
+    "resultHash": "0x4a27aa491c83dd80c0edce562e4b4d4461b316a69882358f137bf8b47c7628dc",
+    "validUntil": 1794800889,
+    "readStateBlockRanges": [
+      {
+        "ActivationBlock": 485878,
+        "ProcessingBlock": 485879,
+        "ProposalBlock": 485882
+      }
+    ],
+    "roundData": [
+      {
+        "round": 0,
+        "leaderIndex": 0,
+        "votesCommitted": 5,
+        "votesRevealed": 5,
+        "appealBond": 0,
+        "rotationsLeft": 3,
+        "result": 1,
+        "roundValidators": [
+          "0xa003e629b6156de5a61a67f9e767602442b66a7a",
+          "0x63cbac77ad803c6a890f030118a9939317571278",
+          "0x0ea95b4932417d09b373c3a9ff256a680754b0a6",
+          "0xe2c63756722362d78ea9afd8232a89cb7d85fbbf",
+          "0xb0dab7fc62e276f5be045b7ec3674f7168623342"
+        ],
+        "validatorVotes": "AQEBAQE=",
+        "validatorVotesHash": [
+          "6bfade178d2c5611f384c458cc1f11feb91e6dc9bc1140db9d68c32e9d8bba99",
+          "9c0a118b5a86bdffa8781e63625ca63b50bb9ebfa341cb9eb53a03098e36183c",
+          "64db31f032f3231b1557f14b7531e5a5f3e3edf806a01e4afa8e0eeebbbaee26",
+          "44ea9386c303c7f2a003656ebb0cc74cef6ce3bf9171ab8153a054de7d275482",
+          "b7f908d93bb8fdcedddda1045ef731119f1c9c09b26d7d1296e7bd6793a2e201"
+        ],
+        "validatorResultHash": [
+          "4a27aa491c83dd80c0edce562e4b4d4461b316a69882358f137bf8b47c7628dc",
+          "4a27aa491c83dd80c0edce562e4b4d4461b316a69882358f137bf8b47c7628dc",
+          "4a27aa491c83dd80c0edce562e4b4d4461b316a69882358f137bf8b47c7628dc",
+          "4a27aa491c83dd80c0edce562e4b4d4461b316a69882358f137bf8b47c7628dc",
+          "4a27aa491c83dd80c0edce562e4b4d4461b316a69882358f137bf8b47c7628dc"
+        ]
+      }
+    ],
+    "fees": {
+      "deposit": "100000000000010352",
+      "userValue": "0",
+      "distribution": {
+        "leaderTimeunitsAllocation": "100",
+        "validatorTimeunitsAllocation": "200",
+        "appealRounds": "0",
+        "executionBudgetPerRound": "25000000000000000",
+        "totalMessageFees": "0",
+        "rotations": [
+          "3"
+        ],
+        "maxPriceGenPerTimeUnit": "2",
+        "storageFeeMaxGasPrice": "300000000",
+        "receiptFeeMaxGasPrice": "300000000"
+      },
+      "locked": {
+        "genPerTimeUnit": "1",
+        "storageUnitPrice": "250000000",
+        "receiptGasPrice": "250000000"
+      },
+      "consumed": {
+        "executionConsumed": "61886000000000",
+        "storageFeeUsed": "4250000000",
+        "messageFeesConsumed": "0",
+        "messageFeesBudgetTotal": "0"
+      },
+      "hasAllocations": false,
+      "allocations": null,
+      "allocationPolicy": "open"
+    }
+  },
+  "id": 1
+}

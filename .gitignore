@@ -1,0 +1,22 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+.coverage
+htmlcov/
+artifacts/
+
+# Node
+node_modules/
+dist/
+
+# Secrets and local state — never commit these
+.env
+.mandate-demo-state.json
+
+# OS
+.DS_Store

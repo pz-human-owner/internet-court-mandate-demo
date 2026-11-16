@@ -1,0 +1,16 @@
+{
+  "title": "MetaMask Smart Accounts Kit delegation briefing",
+  "evidence_partner": "MetaMask (official documentation used as the evidence page)",
+  "partner_note": "MetaMask is shown in the 'Founding Partners' section of https://internetcourt.org/ (checked Nov 15, 2026). This demo uses MetaMask's public documentation only; it is not endorsed by MetaMask.",
+  "evidence_url": "https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/",
+  "allow_subpaths": false,
+  "official_docs_index": "https://docs.metamask.io/",
+  "mandate": "Write a short, accurate briefing on delegation in the MetaMask Smart Accounts Kit. The briefing must only claim features that appear on the bound documentation page, must mention the ERC-7710 standard, must explain that the delegator configures a scope and optional caveats that limit how the delegation can be redeemed, and must not claim that the delegate receives or holds the delegator's private key.",
+  "guidelines": "Return TRUE if the deliverable satisfies every mandate clause and is consistent with the bound page. Return FALSE if the deliverable contradicts the page or violates a mandate clause (including any claim that the delegate receives or holds the delegator's private key). Return UNDETERMINED only if the page text is insufficient or conflicting for deciding. Fetch failures and malformed jury output are operational errors, not verdicts.",
+  "local_heuristic_terms": [
+    "erc-7710",
+    "delegator",
+    "scope",
+    "caveat"
+  ]
+}

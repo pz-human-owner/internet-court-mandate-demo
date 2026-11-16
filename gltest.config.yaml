@@ -1,0 +1,14 @@
+# Local / Studio config only. Do not add private keys or a testnet account block.
+networks:
+  default: localnet
+
+  localnet:
+    url: "http://127.0.0.1:4000/api"
+    leader_only: true
+
+  studionet:
+    leader_only: true
+
+paths:
+  contracts: "contracts"
+  artifacts: "artifacts"

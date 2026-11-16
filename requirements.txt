@@ -1,0 +1,6 @@
+# Optional local contract tests and lint. Public PyPI packages only.
+# genlayer-test downloads the GenVM runtime tarball on first run.
+# No wallet, private key, or network deploy is involved.
+pytest>=8.0.0
+genlayer-test>=0.29.2
+genvm-linter>=0.11.0

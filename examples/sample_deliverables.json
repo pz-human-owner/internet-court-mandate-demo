@@ -1,0 +1,22 @@
+{
+  "_note": "source_page_excerpt is a short verbatim excerpt (link markup removed) of https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/ as retrieved Nov 15, 2026. stub_page_text is invented test text that stands in for a page that no longer covers the topic.",
+  "source_url": "https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/",
+  "source_page_excerpt": "Delegation is the ability for a MetaMask smart account to grant permission to another smart contract or externally owned account (EOA) to perform specific executions on its behalf. The account that grants the permission is called the delegator account, while the account that receives the permission is called the delegate account. The Smart Accounts Kit follows the ERC-7710 standard for smart contract delegation. In addition, users can use delegation scopes and caveat enforcers to apply rules and restrictions to delegations. The delegator creates a delegation, configuring a scope and optional caveats that define the conditions under which the delegation can be redeemed. The delegator signs the delegation, producing a verifiable signature that the Delegation Manager can later validate.",
+  "stub_page_text": "This page has moved. Browse the documentation index to find the current location of this guide.",
+  "pass": {
+    "label": "Expected TRUE: meets every clause and matches the page",
+    "source_url": "https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/",
+    "deliverable": "The MetaMask Smart Accounts Kit follows the ERC-7710 standard for smart contract delegation. The delegator creates a delegation, configuring a scope and optional caveats that define the conditions under which the delegation can be redeemed. The delegator signs the delegation, and the Delegation Manager later validates that signature."
+  },
+  "fail": {
+    "label": "Expected FALSE: violates the private-key clause and contradicts the page on caveats",
+    "source_url": "https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/",
+    "deliverable": "With the MetaMask Smart Accounts Kit and ERC-7710, the delegate holds the delegator's private key, so the scope and caveats are only suggestions and cannot limit what the delegate does."
+  },
+  "undetermined": {
+    "label": "Expected UNDETERMINED: same honest briefing, but the bound page no longer covers the topic (judge with the stub page)",
+    "source_url": "https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/",
+    "page": "stub",
+    "deliverable": "The MetaMask Smart Accounts Kit follows the ERC-7710 standard for smart contract delegation. The delegator creates a delegation, configuring a scope and optional caveats that define the conditions under which the delegation can be redeemed. The delegator signs the delegation, and the Delegation Manager later validates that signature."
+  }
+}
