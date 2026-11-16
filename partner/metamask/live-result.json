@@ -1,0 +1,90 @@
+{
+  "note": "Live run on Ethereum Sepolia (chain 11155111). Throwaway testnet keys; no private keys in this file.",
+  "chainId": 11155111,
+  "delegationManager": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+  "simpleFactory": "0x69Aa2f9fe1572F1B640E1bbc512f5c3a734fc77c",
+  "genlayerCase": {
+    "chainId": 4221,
+    "network": "GenLayer Testnet Bradbury",
+    "contract": "0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B",
+    "readMethod": "get_verdict (read-only gen_call)",
+    "status": "resolved",
+    "verdict": "TRUE",
+    "rawGetVerdict": {
+      "note": "Raw get_verdict response from a separate read-only gen_call made after the live run (no transaction). The settle-time read at 2026-11-16T20:39Z returned status resolved / verdict TRUE, as recorded above; its raw text was not saved.",
+      "endpoint": "https://rpc-bradbury.genlayer.com",
+      "requestedAtUtc": "2026-11-16T21:10:51.728Z",
+      "receivedAtUtc": "2026-11-16T21:10:58.313Z",
+      "response": "{\"status\": \"resolved\", \"verdict\": \"TRUE\", \"reasoning\": \"The deliverable accurately reflects the page: it mentions ERC-7710, states that the delegator configures a scope and optional caveats, and does not claim the delegate receives the private key. All mandate clauses are satisfied.\", \"quote\": \"The delegator creates a delegation, configuring a scope and optional caveats that define the conditions under which the delegation can be redeemed.\", \"source_url\": \"https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/\", \"last_error\": \"\", \"attempts\": 1}"
+    }
+  },
+  "accounts": {
+    "owner": "0xF7EA5cC74Cd44c5EA35c0285bC44eB76A7c20bF4",
+    "clerk": "0x906b4D9d64a5d4Bb559292A3f24562835a122D10",
+    "principalSmartAccount": "0x2d006AF0f603CA2C2a6b8f9689A20E1dc65FC976",
+    "agent": "0x8b5deeE4A52c321C81C33b2bC99834EB05B04929"
+  },
+  "delegation": {
+    "hash": "0xd76ec7fbd8dd4352cd2aaf9b99cb15e515536bee9363e3d760992793ff778187",
+    "salt": "0x4ecd88166fcf7b929f66342a4ee81440ff553e1f8b76c8bcf763ace4107de8c1",
+    "delegator": "0x2d006AF0f603CA2C2a6b8f9689A20E1dc65FC976",
+    "delegate": "0x906b4D9d64a5d4Bb559292A3f24562835a122D10",
+    "feeWei": "1000000000000000",
+    "expiresAtUnix": 1795466345,
+    "expiresAtUtc": "2026-11-23T20:39:05.000Z",
+    "caveatEnforcers": [
+      "0x99F2e9bF15ce5eC84685604836F71aB835DBBdED",
+      "0xF71af580b9c3078fbc2BBF16FbB8EEd82b330320",
+      "0x146713078D39eCC1F5338309c28405ccf85Abfbb",
+      "0xE144b0b2618071B4E56f746313528a669c7E65c5",
+      "0x04658B29F6b82ed55274221a06Fc97D318E25416",
+      "0x1046bb45C8d673d4ea75321280DB34899413c069"
+    ]
+  },
+  "transactions": {
+    "A_deploySmartAccount": {
+      "hash": "0x0897bcffcc2afd00de69936ab89de6613c4fc1bccb8b2b4130c4092ea79ca51a",
+      "etherscan": "https://sepolia.etherscan.io/tx/0x0897bcffcc2afd00de69936ab89de6613c4fc1bccb8b2b4130c4092ea79ca51a",
+      "status": "success",
+      "block": 12149738,
+      "timestampUtc": "2026-11-16T20:38:48.000Z",
+      "from": "0x906b4d9d64a5d4bb559292a3f24562835a122d10",
+      "to": "0x69aa2f9fe1572f1b640e1bbc512f5c3a734fc77c",
+      "valueEth": "0",
+      "gasUsed": 825911,
+      "logs": 4
+    },
+    "B_fundSmartAccount": {
+      "hash": "0xef5104a490e68ae7078b396beaab9080922301fdf2caad69da0aed27218881c3",
+      "etherscan": "https://sepolia.etherscan.io/tx/0xef5104a490e68ae7078b396beaab9080922301fdf2caad69da0aed27218881c3",
+      "status": "success",
+      "block": 12149739,
+      "timestampUtc": "2026-11-16T20:39:00.000Z",
+      "from": "0x906b4d9d64a5d4bb559292a3f24562835a122d10",
+      "to": "0x2d006af0f603ca2c2a6b8f9689a20e1dc65fc976",
+      "valueEth": "0.001",
+      "gasUsed": 26333,
+      "logs": 1
+    },
+    "C_redeemDelegation": {
+      "hash": "0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f",
+      "etherscan": "https://sepolia.etherscan.io/tx/0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f",
+      "status": "success",
+      "block": 12149741,
+      "timestampUtc": "2026-11-16T20:39:24.000Z",
+      "from": "0x906b4d9d64a5d4bb559292a3f24562835a122d10",
+      "to": "0xdb9b1e94b5b69df7e401ddbede43491141047db3",
+      "valueEth": "0",
+      "gasUsed": 626896,
+      "logs": 4
+    }
+  },
+  "checks": {
+    "smartAccountHasCode": true,
+    "agentBalanceBeforeRedeemEth": "0",
+    "agentBalanceAfterRedeemEth": "0.001",
+    "agentReceivedEth": "0.001",
+    "smartAccountBalanceBeforeRedeemEth": "0.001",
+    "smartAccountBalanceAfterRedeemEth": "0"
+  }
+}
