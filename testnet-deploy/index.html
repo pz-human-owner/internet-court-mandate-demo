@@ -32,7 +32,7 @@
  .hero-links a{margin-right:14px}
  table.tx tr.sub.chk th{background:#eef7f1;border-top:2px solid #3a9d5d}
  .badge.chk{background:#eaf2ff;color:#1d4f91;border-color:#6d93d1}
- .break td.out{white-space:nowrap;font-weight:700} .break .refused{color:#17643a} .break .opened{color:#1d4f91} .break .unexpected{color:#a11} .break .error{color:#7a5a00} .break .pending{color:#666;font-weight:400}
+ .break td.out{white-space:nowrap;font-weight:700} .break .refused{color:#17643a} .break .opened{color:#1d4f91} .break .closed{color:#17643a} .break .unexpected{color:#a11} .break .error{color:#7a5a00} .break .pending{color:#666;font-weight:400}
  .break td small{display:block;color:#444;margin-top:2px}
  @media (max-width:640px){.flow{grid-template-columns:1fr} table.tx th:nth-child(3),table.tx td:nth-child(3){display:none}}
 </style>
@@ -129,7 +129,7 @@
 
 <section class="settle break" id="break-it" aria-labelledby="break-it-h">
 <h2 id="break-it-h">Try to break it</h2>
-<p>Each row below tries to get the agent paid without a TRUE verdict for this case, or to get paid twice, and asks Ethereum Sepolia what would happen. Every check is a read-only <code>eth_call</code> simulation (or a read-only GenLayer <code>gen_call</code>): <b>no wallet, no signature, no transaction</b>. The calldata is the agent's own redemption from the on-chain verdict check (<a href="https://sepolia.etherscan.io/tx/0xb5dd287b80fcb96bffefdbcaf1819652d92433ac78ad7032f7e9bf2be488955d">T5</a>), read from the chain by its hash. Some rows pin a past Sepolia block or add an <code>eth_call</code> state override; an override changes only that one simulated call.</p>
+<p>Each row below tries to get the agent paid without a TRUE verdict for this case, or to get paid twice, and asks Ethereum Sepolia what would happen. Every check is a read-only <code>eth_call</code> simulation (or a read-only GenLayer <code>gen_call</code>): <b>this panel uses no wallet, no signature and no transaction</b> (the optional MetaMask section further down is separate). The calldata is the agent's own redemption from the on-chain verdict check (<a href="https://sepolia.etherscan.io/tx/0xb5dd287b80fcb96bffefdbcaf1819652d92433ac78ad7032f7e9bf2be488955d">T5</a>), read from the chain by its hash. Some rows pin a past Sepolia block or add an <code>eth_call</code> state override; an override changes only that one simulated call. Before a row counts, read-only probes on the same RPC, block and overrides confirm the simulated state it describes, and the control row must go through on that same RPC.</p>
 <p class="note"><b>What this shows, and what it doesn't.</b> It shows what MetaMask's Delegation Framework and <code>VerdictGateEnforcer</code> refuse on-chain. It does not show that the carrier is honest: no contract on Sepolia checks GenLayer itself, and the carrier that posts TRUE is a trusted off-chain writer. A row reads "Could not check" if a public RPC fails; that is never counted as a pass.</p>
 <button id="break-run">Run the checks again (read-only)</button> <span id="break-status" class="pending">Not run yet.</span>
 <table class="tx">

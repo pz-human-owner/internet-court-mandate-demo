@@ -13,7 +13,7 @@ import {
   viewContractAddress, parseVerdict, parseCase, RECORDED_RUN, recordedTxLinks, withTimeout,
   resumeFromStatus, resumeOnReadFailure, normalizeCaseStatus,
 } from './plan.mjs';
-import { CHECKS, ADDR, runChecks, outcomeLabel } from './breakit.mjs';
+import { CHECKS, ADDR, runChecks, outcomeLabel, PASS_OUTCOMES } from './breakit.mjs';
 
 const $ = (id) => document.getElementById(id);
 const gate = createStepGate();
@@ -398,7 +398,7 @@ async function runBreakIt() {
   const readFalseVerdict = async () => parseVerdict(await withTimeout(reader.readContract({ address: ADDR.falseCase, functionName: 'get_verdict', args: [] }), VIEW_TIMEOUT_MS, 'get_verdict'));
   try {
     const results = await runChecks({ rpcFor, readFalseVerdict, onResult: showBreakResult });
-    const ok = results.filter((r) => r.outcome === 'refused' || r.outcome === 'opened').length;
+    const ok = results.filter((r) => PASS_OUTCOMES.includes(r.outcome)).length;
     const bad = results.filter((r) => r.outcome === 'unexpected').length;
     $('break-status').className = bad ? 'unexpected' : (ok === results.length ? 'refused' : 'error');
     $('break-status').textContent = `${ok} of ${results.length} checks behaved as expected${bad ? `, ${bad} unexpected` : ''}${ok + bad < results.length ? `, ${results.length - ok - bad} could not be checked` : ''} (${new Date().toLocaleTimeString()}, read-only).`;

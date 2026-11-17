@@ -7,6 +7,11 @@
 // eth_call state overrides (for example "pretend TRUE was posted for another case"). An override changes
 // only that one simulated call.
 //
+// A row is marked as behaving as expected only if, on the SAME RPC endpoint, (1) read-only probes at the
+// same block with the same overrides confirm the simulated state the row describes (the verdictTrue
+// value(s) and the principal's balance), (2) the control (named carrier posts TRUE for this case) goes
+// through, and (3) the redemption returns the exact expected result. Otherwise it is "Could not check".
+//
 // Trust model, stated plainly: VerdictGateEnforcer checks that the carrier named in the signed delegation
 // recorded TRUE for exactly this case. No contract on Sepolia checks GenLayer itself; the carrier is a
 // trusted off-chain writer. These checks show what the on-chain limits refuse. They do not show that the
@@ -66,6 +71,9 @@ export const GATE_REVERT = 'VerdictGateEnforcer:verdict-not-true';
 
 const gateOn = (slot) => ({ [ADDR.enforcer]: { stateDiff: { [slot]: ONE } } });
 const hex = (n) => '0x' + Number(n).toString(16);
+/** State a row depends on, confirmed by read-only probes on the same RPC, block and overrides. */
+const vt = (carrier, caseName, want) => Object.freeze({ kind: 'verdictTrue', carrier, caseName, want });
+const funded = Object.freeze({ kind: 'balance', who: ADDR.principal, min: BigInt(FEE_WEI_HEX) });
 
 /**
  * The checks, in display order. `call` checks eth_call the agent's redemption calldata.
@@ -77,6 +85,7 @@ export const CHECKS = Object.freeze([
     title: 'The agent redeems before any TRUE is posted',
     how: `Sepolia block ${BLOCK.T2} (fee funded, no verdict posted yet), as is.`,
     from: ADDR.agent, block: BLOCK.T2, overrides: null,
+    state: [vt(ADDR.carrier, 'trueCase', 0), funded],
     expect: { revert: [GATE_REVERT] },
     why: 'The verdict gate is a caveat of the signed delegation, so MetaMask\'s DelegationManager calls it on every redemption. Nothing has been posted for this case, so it refuses.',
   },
@@ -85,6 +94,7 @@ export const CHECKS = Object.freeze([
     title: 'Fund the account, but post no verdict',
     how: `Sepolia block ${BLOCK.T1} (before funding), with only the principal's balance overridden to the 0.001 ETH fee.`,
     from: ADDR.agent, block: BLOCK.T1, overrides: { [ADDR.principal]: { balance: FEE_WEI_HEX } },
+    state: [vt(ADDR.carrier, 'trueCase', 0), funded],
     expect: { revert: [GATE_REVERT] },
     why: 'Money in the account is not enough. The gate still refuses, so it is the gate, not a missing balance, that stops the payment.',
   },
@@ -93,6 +103,7 @@ export const CHECKS = Object.freeze([
     title: 'Post TRUE for a different case',
     how: `Block ${BLOCK.T2}, pretending the named carrier posted TRUE for the FALSE case (${ADDR.falseCase.slice(0, 6)}…${ADDR.falseCase.slice(-4)}) instead.`,
     from: ADDR.agent, block: BLOCK.T2, overrides: gateOn(SLOT.falseCase),
+    state: [vt(ADDR.carrier, 'falseCase', 1), vt(ADDR.carrier, 'trueCase', 0), funded],
     expect: { revert: [GATE_REVERT] },
     why: 'The case key is part of the signed caveat terms. A TRUE for any other case does not open this delegation.',
   },
@@ -101,6 +112,7 @@ export const CHECKS = Object.freeze([
     title: 'Someone other than the named carrier posts TRUE',
     how: `Block ${BLOCK.T2}, pretending address 0x…dEaD posted TRUE for this case.`,
     from: ADDR.agent, block: BLOCK.T2, overrides: gateOn(SLOT.otherCarrier),
+    state: [vt(ADDR.otherCarrier, 'trueCase', 1), vt(ADDR.carrier, 'trueCase', 0), funded],
     expect: { revert: [GATE_REVERT] },
     why: 'Only the carrier named in the signed delegation counts. A TRUE from anyone else is ignored.',
   },
@@ -109,22 +121,25 @@ export const CHECKS = Object.freeze([
     title: 'A stranger redeems, even with TRUE posted',
     how: `Block ${BLOCK.T2}, sent from 0x…bEEF, with TRUE posted for this case by the named carrier.`,
     from: ADDR.outsider, block: BLOCK.T2, overrides: gateOn(SLOT.trueCase),
+    state: [vt(ADDR.carrier, 'trueCase', 1), funded],
     expect: { revert: ['InvalidDelegate'] },
     why: 'MetaMask\'s DelegationManager only lets the delegate (the agent) redeem. A verdict does not change who may be paid.',
   },
   {
     id: 'replay', kind: 'call',
     title: 'The agent redeems a second time after being paid',
-    how: 'Latest Sepolia block (after the real payment), with the principal re-funded by an override.',
-    from: ADDR.agent, block: 'latest', overrides: { [ADDR.principal]: { balance: FEE_WEI_HEX } },
+    how: `Sepolia block ${BLOCK.T5} (right after the real payment, before the delegation's expiry), with the principal re-funded by an override.`,
+    from: ADDR.agent, block: BLOCK.T5, overrides: { [ADDR.principal]: { balance: FEE_WEI_HEX } },
+    state: [vt(ADDR.carrier, 'trueCase', 1), funded],
     expect: { revert: ['NativeTokenTransferAmountEnforcer:allowance-exceeded', 'LimitedCallsEnforcer:limit-exceeded'] },
-    why: 'The delegation allows exactly 0.001 ETH, once. MetaMask\'s own caveat enforcers refuse a second payment.',
+    why: 'The delegation allows exactly 0.001 ETH, once. MetaMask\'s own caveat enforcers refuse a second payment (the amount caveat is listed before the one-call and time caveats, so it answers first).',
   },
   {
     id: 'control', kind: 'call',
     title: 'Control: the named carrier posts TRUE for this case',
     how: `Block ${BLOCK.T2}, pretending the named carrier posted TRUE for this case (what really happened at block ${BLOCK.T4}).`,
     from: ADDR.agent, block: BLOCK.T2, overrides: gateOn(SLOT.trueCase),
+    state: [vt(ADDR.carrier, 'trueCase', 1), funded],
     expect: { success: true },
     why: 'The same call goes through. So the refusals above come from the gate and the limits, not from a call that can never succeed.',
   },
@@ -167,7 +182,7 @@ export function revertData(error) {
  *   - 'refused'  : reverted with an expected reason (the attack was stopped);
  *   - 'opened'   : did not revert, and the check expected success (the control);
  *   - 'unexpected': anything else that IS a real answer (wrong reason, or a success where a refusal was expected);
- *   - 'error'    : no usable answer (transport, archive limit, undecodable data). Never shown as a pass.
+ *   - 'error'    : no usable answer (transport, archive limit). Never shown as a pass.
  */
 export function classify(check, response) {
   if (!response || typeof response !== 'object') return { outcome: 'error', detail: 'no JSON-RPC response' };
@@ -175,7 +190,7 @@ export function classify(check, response) {
     const data = revertData(response.error);
     if (!data) return { outcome: 'error', detail: String(response.error.message ?? 'RPC error').slice(0, 160) };
     const reason = decodeRevert(data);
-    if (!reason) return { outcome: 'error', detail: `revert data ${data.slice(0, 10)} did not decode` };
+    if (!reason) return { outcome: 'unexpected', detail: `reverted with unknown error ${data.slice(0, 10)}` };
     if (check.expect.revert && check.expect.revert.includes(reason)) return { outcome: 'refused', reason };
     return { outcome: 'unexpected', reason, detail: `reverted with ${reason}` };
   }
@@ -184,8 +199,13 @@ export function classify(check, response) {
   return { outcome: 'unexpected', detail: 'the call did NOT revert' };
 }
 
-/** A transport-level failure worth retrying on the next RPC (not a real answer). */
-export const isRetryable = (r) => !r || typeof r !== 'object' || (r.error && !revertData(r.error)) || (!r.error && typeof r.result !== 'string');
+/** A transport-level failure worth retrying on the next RPC (not a real answer), per JSON-RPC method. */
+export function isRetryable(r, method = 'eth_call') {
+  if (!r || typeof r !== 'object') return true;
+  if (method === 'eth_getTransactionByHash') return !!r.error || !r.result || typeof r.result !== 'object' || typeof r.result.input !== 'string';
+  if (method === 'eth_getTransactionReceipt') return !!r.error || !r.result || typeof r.result !== 'object' || typeof r.result.status !== 'string';
+  return (r.error && !revertData(r.error)) || (!r.error && typeof r.result !== 'string');
+}
 
 /** Build the eth_call params for a call check. */
 export function callParams(check, tx) {
@@ -196,12 +216,15 @@ export function callParams(check, tx) {
 }
 
 /** Require that the fetched transaction really is the agent's redemption on the DelegationManager. */
-export function checkRedemptionTx(tx3, tx5) {
+export function checkRedemptionTx(tx3, tx5, receipt5) {
   const low = (s) => String(s ?? '').toLowerCase();
   if (!tx5 || !tx5.input || !tx5.gas) return 'the agent\'s redemption transaction could not be read';
+  if (low(tx5.hash) !== low(TX.T5) || (tx3 && low(tx3.hash) !== low(TX.T3))) return 'the RPC returned a different transaction than the one requested';
   if (low(tx5.to) !== low(ADDR.delegationManager)) return 'the redemption is not addressed to MetaMask\'s DelegationManager';
   if (low(tx5.from) !== low(ADDR.agent)) return 'the redemption was not sent by the agent';
   if (!tx3 || low(tx3.input) !== low(tx5.input)) return 'the reverted attempt (T3) and the payment (T5) do not carry the same calldata';
+  if (!receipt5 || low(receipt5.transactionHash) !== low(TX.T5)) return 'the payment receipt (T5) could not be read';
+  if (low(receipt5.status) !== '0x1') return 'the payment receipt (T5) does not show success';
   return null;
 }
 
@@ -222,45 +245,117 @@ export function classifyFalseCase({ verdict, caseKeyResult, verdictTrueResult })
   if (typeof verdictTrueResult !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(verdictTrueResult)) return { outcome: 'error', detail: 'verdictTrue could not be read' };
   const posted = BigInt(verdictTrueResult) !== 0n;
   if (verdict.status === 'resolved' && verdict.verdict === 'FALSE' && !posted) {
-    return { outcome: 'refused', detail: 'GenLayer says FALSE (resolved); nothing is posted for this case on Sepolia (verdictTrue = false)' };
+    return { outcome: 'closed', detail: 'GenLayer says FALSE (resolved); nothing is posted for this case on Sepolia (verdictTrue = false), so the gate stays closed' };
   }
   return { outcome: 'unexpected', detail: `GenLayer verdict ${verdict.status}/${verdict.verdict}, verdictTrue = ${posted}` };
+}
+
+/** EVM init code that returns BALANCE(who) as 32 bytes: an eth_call with no `to` runs it, honouring overrides. */
+export function balanceProbeCode(who) {
+  return '0x73' + who.toLowerCase().replace(/^0x/, '').padStart(40, '0') + '31600052602060' + '00f3';
+}
+
+/** eth_call params of the read-only probes that confirm a row's simulated state (same block, same overrides). */
+export function stateProbes(check) {
+  const block = check.block === 'latest' ? 'latest' : hex(check.block);
+  return (check.state ?? []).map((st) => {
+    const obj = st.kind === 'verdictTrue'
+      ? { to: ADDR.enforcer, data: verdictTrueCalldata(st.carrier, CASE_KEY[st.caseName]) }
+      : { data: balanceProbeCode(st.who) };
+    const params = [obj, block];
+    if (check.overrides) params.push(check.overrides);
+    return { st, params };
+  });
+}
+
+/** Does one probe answer confirm its requirement? 'ok' | 'retry' (no usable answer) | a mismatch description. */
+export function judgeProbe(st, response) {
+  if (isRetryable(response, 'eth_call') || response.error) return 'retry';
+  const r = response.result;
+  if (!/^0x[0-9a-fA-F]{1,64}$/.test(r)) return 'retry';
+  const v = BigInt(r);
+  if (st.kind === 'verdictTrue') {
+    return v === BigInt(st.want) ? 'ok' : `verdictTrue(${st.carrier.slice(0, 6)}…, ${st.caseName}) read ${v} instead of ${st.want}`;
+  }
+  return v >= st.min ? 'ok' : `principal balance read ${v} wei, below the fee`;
 }
 
 /**
  * Run every check. `rpcFor(url)` returns an async (method, params) => raw JSON-RPC body (it may throw).
  * `readFalseVerdict()` returns the parsed get_verdict of the FALSE case (read-only gen_call).
  * `onResult(check, result)` is called as each check finishes. Sends nothing.
+ *
+ * Every simulated row runs entirely on one endpoint: its state probes, the control, and the redemption call.
+ * If any of those has no usable answer, or a probe shows the override was not applied, the row moves to the
+ * next endpoint; if no endpoint passes all three, the row is "Could not check".
  */
-export async function runChecks({ rpcFor, readFalseVerdict, onResult = () => {}, rpcs = SEPOLIA_RPCS }) {
-  const ask = async (method, params) => {
-    let last = null;
-    for (const url of rpcs) {
-      try {
-        const r = await rpcFor(url)(method, params);
-        if (!isRetryable(r)) return { response: r, url };
-        last = { response: r, url };
-      } catch (e) { last = { response: { error: { message: e.message || String(e) } }, url }; }
-    }
-    return last ?? { response: null, url: null };
+export async function runChecks({ rpcFor, readFalseVerdict, onResult = () => {}, rpcs = SEPOLIA_RPCS, retryDelayMs = 800 }) {
+  // One endpoint, one request; a non-answer (rate limit, timeout, archive hiccup) is retried once on the SAME
+  // endpoint after a short pause. A real answer, including any revert, is never retried.
+  const once = async (url, method, params) => {
+    try { return await rpcFor(url)(method, params); } catch (e) { return { error: { message: e.message || String(e) } }; }
   };
+  const call = async (url, method, params) => {
+    const r = await once(url, method, params);
+    if (!isRetryable(r, method)) return r;
+    await new Promise((res) => setTimeout(res, retryDelayMs));
+    return once(url, method, params);
+  };
+  const ask = async (method, params) => {
+    for (const url of rpcs) {
+      const r = await call(url, method, params);
+      if (!isRetryable(r, method)) return { response: r, url };
+    }
+    return { response: null, url: null };
+  };
+  const [{ response: r3 }, { response: r5 }, { response: rc5 }] = await Promise.all([
+    ask('eth_getTransactionByHash', [TX.T3]), ask('eth_getTransactionByHash', [TX.T5]), ask('eth_getTransactionReceipt', [TX.T5])]);
+  const txProblem = checkRedemptionTx(r3?.result, r5?.result, rc5?.result);
+  const control = CHECKS.find((c) => c.id === 'control');
+
+  // One row on one endpoint: { result } when the endpoint gave a usable verdict, or { skip: why }.
+  const onEndpoint = async (check, url) => {
+    for (const { st, params } of stateProbes(check)) {
+      const j = judgeProbe(st, await call(url, 'eth_call', params));
+      if (j === 'retry') return { skip: 'a state probe got no usable answer' };
+      if (j !== 'ok') return { skip: `simulated state not confirmed (${j})` };
+    }
+    const r = await call(url, 'eth_call', callParams(check, r5.result));
+    if (isRetryable(r, 'eth_call')) return { skip: String(r?.error?.message ?? 'no usable answer').slice(0, 120) };
+    return { result: classify(check, r) };
+  };
+  const controlCache = new Map();
+  const controlOn = (url) => {
+    if (!controlCache.has(url)) controlCache.set(url, onEndpoint(control, url));
+    return controlCache.get(url);
+  };
+
   const results = [];
-  const [{ response: r3 }, { response: r5 }] = await Promise.all([ask('eth_getTransactionByHash', [TX.T3]), ask('eth_getTransactionByHash', [TX.T5])]);
-  const txProblem = checkRedemptionTx(r3?.result, r5?.result);
   for (const check of CHECKS) {
     let result;
     if (check.kind === 'call') {
       if (txProblem) result = { outcome: 'error', detail: txProblem };
       else {
-        const { response, url } = await ask('eth_call', callParams(check, r5.result));
-        result = { ...classify(check, response), rpc: url };
+        const notes = [];
+        for (const url of rpcs) {
+          const host = url.replace(/^https?:\/\//, '').split('/')[0];
+          if (check.id !== 'control') {
+            const c = await controlOn(url);
+            if (!c.result || c.result.outcome !== 'opened') { notes.push(`${host}: control did not go through here`); continue; }
+          }
+          const o = check.id === 'control' ? await controlOn(url) : await onEndpoint(check, url);
+          if (o.skip) { notes.push(`${host}: ${o.skip}`); continue; }
+          result = { ...o.result, rpc: url, stateConfirmed: true };
+          break;
+        }
+        if (!result) result = { outcome: 'error', detail: notes.join('; ').slice(0, 300) || 'no RPC answered' };
       }
     } else {
       try {
         const verdict = await readFalseVerdict();
         const { response: ck } = await ask('eth_call', [{ to: ADDR.enforcer, data: caseKeyCalldata(4221, ADDR.falseCase) }, 'latest']);
-        const { response: vt, url } = await ask('eth_call', [{ to: ADDR.enforcer, data: verdictTrueCalldata(ADDR.carrier, CASE_KEY.falseCase) }, 'latest']);
-        result = { ...classifyFalseCase({ verdict, caseKeyResult: ck?.result, verdictTrueResult: vt?.result }), rpc: url };
+        const { response: vtr, url } = await ask('eth_call', [{ to: ADDR.enforcer, data: verdictTrueCalldata(ADDR.carrier, CASE_KEY.falseCase) }, 'latest']);
+        result = { ...classifyFalseCase({ verdict, caseKeyResult: ck?.result, verdictTrueResult: vtr?.result }), rpc: url };
       } catch (e) { result = { outcome: 'error', detail: e.message || String(e) }; }
     }
     results.push({ id: check.id, ...result });
@@ -269,7 +364,10 @@ export async function runChecks({ rpcFor, readFalseVerdict, onResult = () => {},
   return results;
 }
 
+/** Outcomes that count as "behaved as expected". */
+export const PASS_OUTCOMES = Object.freeze(['refused', 'opened', 'closed']);
+
 /** Text for an outcome badge. */
 export function outcomeLabel(outcome) {
-  return ({ refused: 'Refused ✓', opened: 'Goes through ✓ (control)', unexpected: 'Unexpected ✗', error: 'Could not check' })[outcome] ?? 'Could not check';
+  return ({ refused: 'Refused ✓', opened: 'Goes through ✓ (control)', closed: 'Closed ✓ (nothing posted)', unexpected: 'Unexpected ✗', error: 'Could not check' })[outcome] ?? 'Could not check';
 }
