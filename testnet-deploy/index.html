@@ -30,6 +30,8 @@
  table.tx tr.sub th{background:#fff8e6;border-top:2px solid #c9a227}
  .badge.no{background:#fff6dc;color:#7a5a00;border-color:#c9a227}
  .hero-links a{margin-right:14px}
+ table.tx tr.sub.chk th{background:#eef7f1;border-top:2px solid #3a9d5d}
+ .badge.chk{background:#eaf2ff;color:#1d4f91;border-color:#6d93d1}
  @media (max-width:640px){.flow{grid-template-columns:1fr} table.tx th:nth-child(3),table.tx td:nth-child(3){display:none}}
 </style>
 </head>
@@ -57,7 +59,7 @@
 <section class="settle" id="mm-settle" aria-labelledby="mm-settle-h">
 <h2 id="mm-settle-h">Partner settlement: MetaMask delegation</h2>
 <p>The verdict above also decides a payment. Using the <a href="https://docs.metamask.io/smart-accounts-kit/">MetaMask Smart Accounts Kit</a> (an ERC-7710 delegation), the principal's MetaMask smart account on Ethereum Sepolia lets a settlement account, the <em>clerk</em>, pay the agent, but only in one exact way.</p>
-<p><span class="badge">Live on Sepolia: verdict TRUE → agent paid 0.001 ETH</span> <span class="badge no">Live on Sepolia: an outsider's redemption and a repeat redemption both reverted</span></p>
+<p><span class="badge">Live on Sepolia: verdict TRUE → agent paid 0.001 ETH</span> <span class="badge no">Live on Sepolia: an outsider's redemption and a repeat redemption both reverted</span> <span class="badge chk">Live on Sepolia: on-chain verdict check, blocked before the verdict was posted, paid after</span></p>
 <ol class="flow" aria-label="How the payment follows the verdict">
  <li><b>1 · Grant</b>The principal signs one delegation to the clerk: “pay the agent exactly 0.001 ETH, once, before expiry.” This is an off-chain signature, not a transaction.</li>
  <li class="ok"><b>2 · Verdict TRUE → paid</b>The clerk reads <code>get_verdict</code> from this GenLayer contract. On a resolved TRUE it redeems the delegation through MetaMask's DelegationManager, and the agent receives 0.001 ETH.</li>
@@ -78,26 +80,40 @@
   <tr><td>R1 · The agent tries to redeem that delegation itself, skipping the clerk</td><td><a href="https://sepolia.etherscan.io/tx/0x323887a077ab6f8be8226ab47f259f7a1b6562df2627db31f8ee5e592c33528b">0x323887a0…528b</a></td><td>12150397</td><td>Reverted on-chain: DelegationManager <code>InvalidDelegate</code> (only the clerk may redeem)</td></tr>
   <tr><td>R2 · The clerk tries to redeem the delegation already paid in step C a second time</td><td><a href="https://sepolia.etherscan.io/tx/0x28c9837c4137efd47ef85cac8940499cb792dfbc53b8860d9a41b3f92755d640">0x28c9837c…d640</a></td><td>12150399</td><td>Reverted on-chain: <code>NativeTokenTransferAmountEnforcer:allowance-exceeded</code>; no second payment</td></tr>
  </tbody>
+ <tbody id="onchain-rows">
+  <tr class="sub chk"><th colspan="4" scope="rowgroup">On-chain verdict check on Sepolia (VerdictGateEnforcer)</th></tr>
+  <tr><td>T1 · Deploy <code>VerdictGateEnforcer</code>, a caveat enforcer for MetaMask's Delegation Framework (<a href="https://repo.sourcify.dev/11155111/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a">source verified on Sourcify</a>, exact match)</td><td><a href="https://sepolia.etherscan.io/tx/0x159d965f9ec998527090f4db4be6b52cba3c30914a0770eb7d09f9ec2ceae181">0x159d965f…e181</a></td><td>12150800</td><td>Success: contract <a href="https://sepolia.etherscan.io/address/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a">0xfEf947Be…074a</a></td></tr>
+  <tr><td>– · The principal signs a new delegation straight to the agent. Its caveats include the verdict gate, whose signed terms name this case (salt from GenLayer chain 4221 + this contract) and the carrier allowed to post its verdict</td><td>no transaction</td><td>–</td><td>Off-chain signature</td></tr>
+  <tr><td>T2 · Fund the principal's smart account with the 0.001 ETH fee</td><td><a href="https://sepolia.etherscan.io/tx/0x15aaf077f0459bee10c4e3665e2bbe31cfc594c348eb629a6c677359a3439f3f">0x15aaf077…9f3f</a></td><td>12150801</td><td>Success</td></tr>
+  <tr><td>T3 · The agent redeems before any verdict is posted on Sepolia</td><td><a href="https://sepolia.etherscan.io/tx/0x4ced2add55d30f2207b0c50e77c75fb2cb55e4245e46be745afe3a616abba90d">0x4ced2add…a90d</a></td><td>12150817</td><td>Reverted on-chain: <code>VerdictGateEnforcer:verdict-not-true</code>; nothing paid</td></tr>
+  <tr><td>T4 · The carrier reads the finalized TRUE verdict from GenLayer and records it: <code>postVerdictTrue(4221, case)</code></td><td><a href="https://sepolia.etherscan.io/tx/0xfb9090a04b906512faf466c52a33c4c7ad4257429a1abf777723c6f3deac2423">0xfb9090a0…2423</a></td><td>12150818</td><td>Success: <code>VerdictTrue</code> event for this case</td></tr>
+  <tr><td>T5 · The agent redeems the same delegation itself; no clerk code involved</td><td><a href="https://sepolia.etherscan.io/tx/0xb5dd287b80fcb96bffefdbcaf1819652d92433ac78ad7032f7e9bf2be488955d">0xb5dd287b…955d</a></td><td>12150819</td><td>Success: agent paid 0.001 ETH</td></tr>
+ </tbody>
 </table>
-<p>Full records (hashes, blocks, addresses, delegation hashes, caveat enforcers, raw <code>get_verdict</code> responses, revert reasons): <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/partner/metamask/live-result.json">live-result.json</a> · <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/partner/metamask/live-refusal-result.json">live-refusal-result.json</a> · Code and tests: <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/partner/metamask/">partner/metamask</a> · Reproduce it: <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/SKILL.md">SKILL.md</a></p>
+<p>Full records (hashes, blocks, addresses, delegation hashes, caveat enforcers, raw <code>get_verdict</code> responses, revert reasons): <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/partner/metamask/live-result.json">live-result.json</a> · <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/partner/metamask/live-refusal-result.json">live-refusal-result.json</a> · <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/partner/metamask/live-onchain-check-result.json">live-onchain-check-result.json</a> · Enforcer source: <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/partner/metamask/contracts/src/VerdictGateEnforcer.sol">VerdictGateEnforcer.sol</a> · Code and tests: <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/partner/metamask/">partner/metamask</a> · Reproduce it: <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/SKILL.md">SKILL.md</a></p>
+
+<h3 id="onchain-check">On-chain verdict check: what moved on-chain, and who is still trusted</h3>
+<p>In the payment run (A–C), the verdict gate and the case label were checked only by the clerk's code. In the on-chain check (T1–T5), they are a caveat on the delegation itself. MetaMask's DelegationManager calls <code>VerdictGateEnforcer</code> on every redemption, and it reverts unless the carrier named in the signed delegation has recorded TRUE for exactly this case. The agent redeems for itself, and no clerk code sits between the recorded verdict and the payment.</p>
+<p class="note"><b>Not trustless.</b> Ethereum Sepolia cannot read GenLayer. The carrier (here the clerk's throwaway key) is trusted to post TRUE only after reading a finalized TRUE verdict from this contract, and no contract on Sepolia checks that it told the truth. It is a trusted relayer, not an oracle. What the carrier cannot do: change the amount, the recipient or any other limit, or post for a delegation that names a different carrier. A posted TRUE cannot be undone: after it, the principal's only remedies are to disable the delegation (<code>disableDelegation</code>) or let it expire. One post opens every delegation that names that carrier and that case; the once-only limit is per delegation, not per case. Anyone can compare its post with <code>get_verdict</code> above.</p>
 
 <h3>Limits checked on-chain by MetaMask's Delegation Framework</h3>
 <ul>
  <li><b>Spending cap:</b> at most the 0.001 ETH fee, in total (<code>nativeTokenTransferAmount</code>)</li>
  <li><b>Plain transfer:</b> requires empty calldata; no function call (<code>exactCalldata</code> with empty terms, added by the spending-cap scope)</li>
  <li><b>Exact payment:</b> the only allowed call sends exactly the fee to the named agent (<code>exactExecution</code>)</li>
- <li><b>Clerk only:</b> no other account can redeem (the delegation names the clerk as its delegate, and the <code>redeemer</code> caveat repeats it)</li>
+ <li><b>Clerk only</b> (runs A–C and R1–R2): no other account can redeem (the delegation names the clerk as its delegate, and the <code>redeemer</code> caveat repeats it). In the on-chain check (T1–T5), the delegate and only redeemer is the agent itself</li>
+ <li><b>Verdict recorded</b> (on-chain check only): redeemable only after the named carrier has recorded TRUE for this case in <code>VerdictGateEnforcer</code> (a custom caveat: 71 lines of Solidity, no owner or admin, source verified)</li>
  <li><b>Once:</b> a single redemption (<code>limitedCalls</code>)</li>
  <li><b>Expiry:</b> only before a deadline (<code>timestamp</code>; the payment run used 7 days, the refusal run's fresh delegation one hour)</li>
 </ul>
 
 <h3>What this does not prove</h3>
 <ul class="note" style="list-style:disc;padding:8px 8px 8px 28px">
- <li><b>The clerk is trusted.</b> GenLayer and Sepolia have no oracle between them, so the clerk's code checks the verdict and the case label (a salt derived from GenLayer chain 4221 + this contract). No contract checks them on Sepolia.</li>
+ <li><b>The clerk is trusted in A–C; the carrier is trusted in T1–T5.</b> GenLayer and Sepolia have no oracle between them. In the payment run, only the clerk's code checks the verdict and the case label (a salt derived from GenLayer chain 4221 + this contract). In the on-chain check, a Sepolia contract checks that the named carrier posted TRUE for this case, but whether the GenLayer verdict really is TRUE still rests on the carrier.</li>
  <li><b>It isn't an escrow.</b> The fee sits in the principal's own smart account, and the owner could move it out before redemption.</li>
- <li><b>One operator.</b> The same operator held the throwaway owner, clerk and agent keys. The clerk paid the gas and funded the fee for the payment run; in the refusal run the agent paid R1's gas from the fee it had received.</li>
+ <li><b>One operator.</b> The same operator held the throwaway owner, clerk and agent keys. The clerk paid the gas and funded the fee for the payment run; in the refusal run the agent paid R1's gas from the fee it had received. In the on-chain check the clerk paid for T1, T2 and T4, and the agent paid for T3 and T5. So the carrier and the agent being different people is not shown, only that the chain enforces the rule between them.</li>
  <li><b>Now live on Sepolia, not just simulated:</b> an outsider redemption and a second redemption, both reverted on-chain (R1, R2). R1 was stopped by the DelegationManager's delegate check before the <code>redeemer</code> caveat ran; the principal's smart account held 0 ETH at the time, so R1 shows that caller check, not a funded payment being blocked. R2 was stopped by the spending cap; the <code>limitedCalls</code> count was already 1 and would also have blocked it.</li>
- <li><b>Still simulated only:</b> a live FALSE or UNDETERMINED verdict (the only deployed case resolved TRUE, and no new GenLayer transactions were made), and a redemption after expiry. Those run in the unit tests and on a local Sepolia fork. The refusal in the first refusal row is the clerk's code, not a chain rule.</li>
+ <li><b>Still simulated only:</b> a live FALSE or UNDETERMINED verdict (the only deployed case resolved TRUE, and no new GenLayer transactions were made), and a redemption after expiry. Those run in the unit tests and on a local Sepolia fork. The refusal in the first refusal row is the clerk's code, not a chain rule. The gate has no way to post FALSE: on Sepolia, a FALSE case looks the same as one that was never posted, and T3 shows that state blocking a funded payment.</li>
 </ul>
 </section>
 
@@ -133,7 +149,7 @@
 </details>
 
 <pre id="log"></pre>
-<p><a href="https://github.com/pz-human-owner/internet-court-mandate-demo">Source on GitHub</a> · <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/releases/tag/v1.2-demo">Demo video</a> · <a href="#mm-settle">MetaMask settlement</a> · <a href="#refusal-rows">Refusal on Sepolia</a> · <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/SKILL.md">SKILL.md (reuse this flow)</a> · Explorer: <a href="https://scan.testnet-chain.genlayer.com">scan.testnet-chain.genlayer.com</a></p>
+<p><a href="https://github.com/pz-human-owner/internet-court-mandate-demo">Source on GitHub</a> · <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/releases/tag/v1.2-demo">Demo video</a> · <a href="#mm-settle">MetaMask settlement</a> · <a href="#refusal-rows">Refusal on Sepolia</a> · <a href="#onchain-rows">On-chain verdict check</a> · <a href="https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/SKILL.md">SKILL.md (reuse this flow)</a> · Explorer: <a href="https://scan.testnet-chain.genlayer.com">scan.testnet-chain.genlayer.com</a></p>
 <script type="module" src="./app.js"></script>
 </body>
 </html>

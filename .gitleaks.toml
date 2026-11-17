@@ -1,0 +1,11 @@
+# Default gitleaks rules, plus one allowlisted public value in four named files.
+# Needs gitleaks >= 8.25 for [[allowlists]] with condition = "AND" (checked with gitleaks 8.28.0). An older binary may
+# ignore this table, which would only flag the value, never hide a leak. CI does not run gitleaks; pin the version if it does.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public case label (salt) of the sample GenLayer case: keccak256('internet-court-mandate-verdict', 4221, 0x07E2…2F8B). Flagged only because its JSON field is named caseKey; it is not a secret. Allowed only in the four committed run records that hold it (AND: both the path and the exact value must match)."
+condition = "AND"
+paths = ['''^partner/metamask/(live-result|sim-result|live-refusal-result|live-onchain-check-result)\.json$''']
+regexes = ['''^0x4ecd88166fcf7b929f66342a4ee81440ff553e1f8b76c8bcf763ace4107de8c1$''']

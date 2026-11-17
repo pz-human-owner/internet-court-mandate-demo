@@ -1,6 +1,6 @@
 ---
 name: internet-court-verdict-gated-payment
-description: Pay an AI agent through a MetaMask ERC-7710 delegation only after a GenLayer Internet Court jury rules its deliverable TRUE. Use when you want to read a MandateVerdict case on GenLayer Testnet Bradbury, deploy your own case, or build, sign and redeem a verdict-gated MetaMask Smart Accounts Kit delegation on Ethereum Sepolia, including the refusal paths.
+description: Pay an AI agent through a MetaMask ERC-7710 delegation only after a GenLayer Internet Court jury rules its deliverable TRUE. Use when you want to read a MandateVerdict case on GenLayer Testnet Bradbury, deploy your own case, or build, sign and redeem a verdict-gated MetaMask Smart Accounts Kit delegation on Ethereum Sepolia, including the refusal paths and an on-chain verdict gate (a custom caveat enforcer whose verdict is posted by a named, trusted carrier).
 ---
 
 # Internet Court verdict → MetaMask payment
@@ -17,6 +17,8 @@ anyone ──request_verdict()──▶ validators fetch the bound page, agree o
 principal's MetaMask smart account ──signs (off-chain)──▶ Delegation(clerk; cap, exact payment, clerk-only, once, expiry)
 clerk ──get_verdict() (read-only)──▶ TRUE? ──redeemDelegations──▶ MetaMask DelegationManager (Sepolia) ──▶ agent paid
                                     else ──▶ no transaction; the delegation lapses at expiry
+step 6: carrier ──reads finalized TRUE──▶ postVerdictTrue ──▶ VerdictGateEnforcer (Sepolia)
+        agent ──redeemDelegations──▶ DelegationManager runs the gate caveat ──▶ paid only after the named carrier posted
 ```
 
 Everything below uses code that is in this repository. Live page:
@@ -33,6 +35,8 @@ https://pz-human-owner.github.io/internet-court-mandate-demo/
 | Principal's Hybrid smart account (throwaway) | Sepolia | `0x2d006AF0f603CA2C2a6b8f9689A20E1dc65FC976` |
 | Payment run: deploy, fund, redeem | Sepolia | [`partner/metamask/live-result.json`](partner/metamask/live-result.json) |
 | Refusal run: an outsider's and a repeat redemption, both reverted | Sepolia | [`partner/metamask/live-refusal-result.json`](partner/metamask/live-refusal-result.json) |
+| `VerdictGateEnforcer` (on-chain verdict gate caveat; source verified on [Sourcify](https://repo.sourcify.dev/11155111/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a)) | Sepolia | [`0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a`](https://sepolia.etherscan.io/address/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a) |
+| On-chain check run: blocked before the verdict was posted, paid after | Sepolia | [`partner/metamask/live-onchain-check-result.json`](partner/metamask/live-onchain-check-result.json) |
 | Raw Bradbury receipts for the case | Bradbury | [`proof/`](proof/) |
 
 ## Setup
@@ -47,6 +51,7 @@ can run them one after another.
 git clone https://github.com/pz-human-owner/internet-court-mandate-demo && cd internet-court-mandate-demo
 (cd partner/metamask && npm ci && npm test)   # offline: delegation shape, caveats, salt, settle() decisions, refusal gate, recorded runs
 (cd testnet-deploy && npm ci && npm test)     # offline: deploy-page guards, live-view helpers, panel content
+(cd partner/metamask && npm run test:contracts)   # needs Foundry: VerdictGateEnforcer unit tests + artifact reproducibility
 ```
 
 ## Workflow
@@ -98,11 +103,11 @@ const delegation = buildPaymentDelegation({
 
 What the delegation carries, all checked on-chain by MetaMask's Delegation Framework at redemption. The signed
 delegation has six caveats, in this order (Sepolia enforcer addresses from `getSmartAccountsEnvironment(11155111)`;
-the same six are in both recorded runs):
+the same six are in the payment and refusal runs; the on-chain check in step 6 adds a seventh):
 
 | # | Caveat (enforcer) | Terms | Effect |
 |---|---|---|---|
-| 1 | `exactCalldata` ([`0x99F2…BdED`](https://sepolia.etherscan.io/address/0x99F2e9bF15ce5eC84685604836F71aB835DBBdED), ExactCalldataEnforcer) | `0x` | added by the `nativeTokenTransferAmount` scope: requires empty calldata; no function call (a plain ETH transfer) |
+| 1 | `exactCalldata` ([`0x99F2…BdED`](https://sepolia.etherscan.io/address/0x99F2e9bF15ce5eC84685604836F71aB835DBBdED), ExactCalldataEnforcer) | `0x` | added by the `nativeTokenTransferAmount` scope: requires empty calldata; no function calldata (a plain ETH transfer) |
 | 2 | `nativeTokenTransferAmount` ([`0xF71a…0320`](https://sepolia.etherscan.io/address/0xF71af580b9c3078fbc2BBF16FbB8EEd82b330320)) | `amountWei` | at most `amountWei` in total |
 | 3 | `exactExecution` ([`0x1467…bfbb`](https://sepolia.etherscan.io/address/0x146713078D39eCC1F5338309c28405ccf85Abfbb)) | agent, `amountWei`, `0x` | the only call allowed is "send exactly `amountWei` to `agent`" |
 | 4 | `redeemer` ([`0xE144…65c5`](https://sepolia.etherscan.io/address/0xE144b0b2618071B4E56f746313528a669c7E65c5)); the delegate is also the clerk | clerk | nobody but the clerk can redeem |
@@ -163,11 +168,78 @@ The refusal runner broadcasts R1 or R2 only after an `eth_call` simulation rever
 sending. After mining it requires a `reverted` receipt and a parent-block replay with the same reason; otherwise it
 exits non-zero and writes nothing. It never overwrites an existing result file.
 
+### 6. Optional: put the verdict gate on-chain (trusted carrier)
+
+[`VerdictGateEnforcer`](partner/metamask/contracts/src/VerdictGateEnforcer.sol) is a 71-line caveat enforcer for
+MetaMask's Delegation Framework. A delegation that carries it can be redeemed only after the **carrier named in its
+signed terms** has called `postVerdictTrue(4221, caseContract)` on the enforcer. Its terms are
+`abi.encode(caseKey, carrier)`, and `caseKey` is the same value as the salt. The verdict gate and the case match
+become chain rules, so the agent can be the delegate and redeem for itself. **It is not trustless:** Sepolia cannot
+read GenLayer, so the carrier is a trusted relayer, not an oracle, trusted to post only a finalized `TRUE`. It
+cannot post FALSE, change the amount, the recipient or any other limit, or post for another carrier.
+A posted TRUE cannot be undone: after it, the principal's only remedies are `disableDelegation` or letting the
+delegation expire. One post opens every delegation that names that carrier and that case; the once-only limit
+(`limitedCalls`) is per delegation, not per case.
+
+```js
+// save as partner/metamask/my-gated.mjs and run (from the repo root): node partner/metamask/my-gated.mjs
+import { getSmartAccountsEnvironment } from '@metamask/smart-accounts-kit';
+import { buildGatedDelegation, carrierDecision } from './src/verdict-gate.mjs';
+import { SAMPLE_CASE } from './src/verdict-payment.mjs';
+
+const delegation = buildGatedDelegation({
+  environment: getSmartAccountsEnvironment(11155111),
+  principal: '0x2d006AF0f603CA2C2a6b8f9689A20E1dc65FC976', // the principal's MetaMask Hybrid smart account
+  agent: '0x8b5deeE4A52c321C81C33b2bC99834EB05B04929',     // delegate, only redeemer, and payee
+  carrier: '0x906b4D9d64a5d4Bb559292A3f24562835a122D10',   // the only account whose verdict post counts
+  gate: '0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a',      // VerdictGateEnforcer on Sepolia
+  amountWei: 10n ** 15n,
+  expiresAt: Math.floor(Date.now() / 1000) + 86400,
+  caseContract: SAMPLE_CASE,
+});
+console.log(delegation.caveats.length, 'caveats; gate terms', delegation.caveats[2].terms);
+// The carrier's rule before it calls postVerdictTrue: resolved TRUE and request_verdict Finalized.
+console.log(carrierDecision({ verdictRaw: '{"status":"resolved","verdict":"TRUE"}', caseContract: SAMPLE_CASE,
+  genReceipt: { recipient: SAMPLE_CASE, statusName: 'Finalized', txExecutionResultName: 'FinishedWithReturn' } }));
+```
+
+Run the whole flow on a local anvil fork first, then live. The runner sends five transactions (deploy, fund, a
+blocked redemption, the carrier's post, the paid redemption) and refuses to send a sixth:
+
+```bash
+(
+  set -e
+  cd partner/metamask
+  set -a; . ./.env; set +a     # OWNER_KEY, CLERK_KEY (also the carrier), AGENT_KEY
+  node scripts/onchain-check.mjs plan
+  node scripts/onchain-check.mjs rehearse --out my-onchain-rehearsal.json      # local anvil fork; nothing broadcast
+  node scripts/onchain-check.mjs run --broadcast --out my-onchain-result.json  # five Sepolia transactions
+)
+```
+
+Each step is sent only if its `eth_call` simulation shows the expected outcome. The blocked redemption must revert
+with `VerdictGateEnforcer:verdict-not-true` and must succeed with `verdictTrue` overridden to TRUE (an `eth_call`
+state override) in a simulation pinned at T2's block, so in that simulation the gate is the only obstacle (the record
+names the block). Reads after each receipt are pinned to explicit blocks. Each send is journaled to
+`<out>.journal.jsonl`: the sender's nonce before the send and the hash as soon as it returns, before any check. If a
+check fails after a broadcast, the runner writes `<out>.incomplete.json` and exits. `run --broadcast --resume
+<incomplete.json> --out <new.json>` continues only when the journal and the chain's nonces and receipts agree that
+exactly T1 and T2 were sent and nothing is pending; T2 comes from the journal. Anything else is refused. An
+incomplete record is single-use: a second resume from the same file is refused.
+The agent pays the gas for its two redemptions, so the agent address needs a little Sepolia ETH.
+
 ## Verify
 
 - Payment: the redeem tx [`0x64a3f537…`](https://sepolia.etherscan.io/tx/0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f) moved 0.001 ETH from the smart account to the agent.
 - Outsider: [`0x323887a0…`](https://sepolia.etherscan.io/tx/0x323887a077ab6f8be8226ab47f259f7a1b6562df2627db31f8ee5e592c33528b), the agent redeeming by itself, reverted with `InvalidDelegate`. The principal's smart account held 0 ETH during R1, so R1 shows the delegate (caller) check, not a funded payment being blocked.
 - Second redemption: [`0x28c9837c…`](https://sepolia.etherscan.io/tx/0x28c9837c4137efd47ef85cac8940499cb792dfbc53b8860d9a41b3f92755d640), the clerk re-using the paid delegation, reverted with `NativeTokenTransferAmountEnforcer:allowance-exceeded`.
+- On-chain gate, blocked: [`0x4ced2add…`](https://sepolia.etherscan.io/tx/0x4ced2add55d30f2207b0c50e77c75fb2cb55e4245e46be745afe3a616abba90d), the agent redeeming a funded gated delegation before any verdict was posted, reverted with `VerdictGateEnforcer:verdict-not-true`.
+- On-chain gate, carrier post: [`0xfb9090a0…`](https://sepolia.etherscan.io/tx/0xfb9090a04b906512faf466c52a33c4c7ad4257429a1abf777723c6f3deac2423) emitted `VerdictTrue(carrier, caseKey, 4221, 0x07E2…2F8B)`.
+- On-chain gate, paid: [`0xb5dd287b…`](https://sepolia.etherscan.io/tx/0xb5dd287b80fcb96bffefdbcaf1819652d92433ac78ad7032f7e9bf2be488955d), the same delegation redeemed by the agent, paid 0.001 ETH. `verdictTrue(carrier, caseKey)` on the enforcer reads `true`.
+- `(cd partner/metamask && node scripts/onchain-check.mjs verify)` re-checks the on-chain run read-only: code equals the
+  committed artifact, all five receipts, a parent-block replay of the blocked redemption, `verdictTrue`, and the
+  Sourcify exact match. Like `refusal.mjs verify`, the replay needs an archive-capable `SEPOLIA_RPC_URL` once the
+  blocks age out of the public RPC's recent-state window. Its 17 November 2026 (UTC) result is in `live-onchain-check-verify.json`.
 - `LimitedCallsEnforcer.callCounts(DelegationManager, delegationHash)` reads how often a delegation was redeemed.
 - `npm test` in `partner/metamask` re-checks both recorded runs against the code (hashes, salts, decoded revert data).
 - `(cd partner/metamask && SEPOLIA_RPC_URL=<an archive-capable Sepolia RPC> node scripts/refusal.mjs verify)` re-reads
@@ -177,10 +249,15 @@ exits non-zero and writes nothing. It never overwrites an existing result file.
 
 ## Trust model and limits
 
-- **The clerk is trusted for the verdict.** GenLayer and Sepolia have no oracle between them. The verdict check and the
+- **The clerk is trusted for the verdict (steps 3–5).** GenLayer and Sepolia have no oracle between them. The verdict check and the
   case match run in the clerk's code; a dishonest clerk could redeem on `FALSE`. It still could not pay anyone else, pay
   more, pay twice, or pay after expiry.
+- **The carrier is trusted for the verdict (step 6).** With `VerdictGateEnforcer` the gate and the case match are checked
+  on-chain, but whether the GenLayer verdict really is `TRUE` rests on the carrier named in the signed delegation. It is a
+  trusted relayer, not an oracle, and this is not trustless. A posted TRUE cannot be undone (the principal can only
+  `disableDelegation` or let it expire), and one post opens every delegation naming that carrier and case. In the
+  recorded run the carrier was the clerk's throwaway key, and one operator held every key.
 - **Not an escrow.** The fee stays in the principal's smart account until redemption; the owner can move it out first.
-- **Live coverage.** On Sepolia: one paid redemption, plus an outsider's redemption and a repeat redemption that both reverted. A live `FALSE` or `UNDETERMINED` verdict
+- **Live coverage.** On Sepolia: one paid redemption, plus an outsider's redemption and a repeat redemption that both reverted, plus a gated redemption that was blocked before the verdict was posted and paid after. A live `FALSE` or `UNDETERMINED` verdict
   and an expired redemption are covered by the unit tests and the local fork, not on a public chain.
 - **Testnets only.** Use throwaway keys. Never paste a seed phrase or private key into a page, a chat or a commit.

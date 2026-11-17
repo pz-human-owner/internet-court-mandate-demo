@@ -1,0 +1,15 @@
+pre  carrier may post: resolved TRUE, request_verdict Finalized (FinishedWithReturn)
+T3 sent 0x4ced2add55d30f2207b0c50e77c75fb2cb55e4245e46be745afe3a616abba90d
+T4 sent 0xfb9090a04b906512faf466c52a33c4c7ad4257429a1abf777723c6f3deac2423
+T5 sent 0xb5dd287b80fcb96bffefdbcaf1819652d92433ac78ad7032f7e9bf2be488955d
+wrote /workspace/ic-demo-live/partner/metamask/live-onchain-check-result.json {
+  "transactionsUsed": 5,
+  "enforcerCodeMatchesArtifact": true,
+  "blockedBeforeVerdict": true,
+  "paidAfterVerdict": true,
+  "principalPaidWei": "1000000000000000",
+  "agentNetFromT5Wei": "999999992069993",
+  "agentGasForT5Wei": "7930007",
+  "limitedCallsCountAfter": 1,
+  "verdictTrueRecorded": true
+}

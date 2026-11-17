@@ -1,3 +1,6 @@
 node_modules/
 .env
 signed-delegation.json
+*.journal.jsonl
+*.incomplete.json
+*.consumed

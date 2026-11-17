@@ -1,0 +1,14 @@
+# Pinned build for VerdictGateEnforcer. `forge build` must reproduce the committed
+# artifact (VerdictGateEnforcer.artifact.json) byte for byte; see scripts/build-enforcer.mjs.
+[profile.default]
+src = "src"
+test = "test"
+out = "out"
+cache_path = "cache"
+libs = []
+solc_version = "0.8.23"
+evm_version = "shanghai"
+optimizer = true
+optimizer_runs = 200
+bytecode_hash = "ipfs"
+cbor_metadata = true

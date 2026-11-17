@@ -24,5 +24,15 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: partner/metamask/package-lock.json
+      # Foundry (pinned) for the VerdictGateEnforcer unit tests, the artifact reproducibility check,
+      # and the local-anvil test in test/verdict-gate.test.mjs. No fork, no network writes.
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.9.0
       - run: npm ci
+      - name: forge test (VerdictGateEnforcer)
+        working-directory: partner/metamask/contracts
+        run: forge test
+      - name: committed artifact matches a fresh pinned build
+        run: node scripts/export-enforcer-artifact.mjs --check
       - run: npm test

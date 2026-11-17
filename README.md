@@ -8,7 +8,7 @@ A principal writes a mandate, binds the evidence a jury may read, and appoints a
 
 The sample case binds official [MetaMask Smart Accounts Kit: Delegation](https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/) documentation (HTTP 200, no redirect, checked 15 November 2026). The mandate asks for a short briefing that mentions ERC-7710, explains that the delegator configures a scope and optional caveats, and never claims that the delegate holds the delegator's private key.
 
-**How MetaMask fits in, plainly:** two ways. (1) The jury reads MetaMask's official delegation documentation as its evidence, and MetaMask is the optional browser signer if you deploy your own copy of the contract. (2) [`partner/metamask/`](partner/metamask/) settles the case with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/): the principal's MetaMask smart account signs an ERC-7710 delegation that can pay the agent a fixed fee once, and a settlement script redeems it only after the GenLayer contract returns TRUE. The delegation's limits are enforced on-chain by MetaMask's Delegation Framework; the verdict check and the case match are done by that script, not by a contract, and the fee is not locked in escrow (see [MetaMask delegation settlement](#metamask-delegation-settlement)). That flow has run live on Ethereum Sepolia against the real Bradbury verdict: the [redeem transaction](https://sepolia.etherscan.io/tx/0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f) paid the agent 0.001 ETH. A second live run showed the refusals: an outsider's redemption and a second redemption both [reverted on Sepolia](#refusal-on-sepolia). MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project is not endorsed by MetaMask.
+**How MetaMask fits in, plainly:** two ways. (1) The jury reads MetaMask's official delegation documentation as its evidence, and MetaMask is the optional browser signer if you deploy your own copy of the contract. (2) [`partner/metamask/`](partner/metamask/) settles the case with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/): the principal's MetaMask smart account signs an ERC-7710 delegation that can pay the agent a fixed fee once, and a settlement script redeems it only after the GenLayer contract returns TRUE. The delegation's limits are enforced on-chain by MetaMask's Delegation Framework. In the first two runs, the verdict check and the case match are done by that script, not by a contract, and in every run the fee is not locked in escrow (see [MetaMask delegation settlement](#metamask-delegation-settlement)). That flow has run live on Ethereum Sepolia against the real Bradbury verdict: the [redeem transaction](https://sepolia.etherscan.io/tx/0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f) paid the agent 0.001 ETH. A second live run showed the refusals: an outsider's redemption and a second redemption both [reverted on Sepolia](#refusal-on-sepolia). A third run moved the verdict gate itself on-chain: a caveat enforcer on Sepolia [blocked the agent's redemption until the verdict was posted, then paid it](#on-chain-verdict-check-on-sepolia). The account that posts the verdict is named in the signed delegation and is still trusted, so this is not trustless. MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project is not endorsed by MetaMask.
 
 ## Live demo
 
@@ -87,6 +87,8 @@ MetaMask's caveat enforcers check these on-chain:
 
 The chain doesn't guarantee that the fee is still there; see step 1. A dishonest clerk could pay the agent on a FALSE verdict, or for the wrong case. It could not pay anyone else, pay more, or pay twice.
 
+The [on-chain verdict check](#on-chain-verdict-check-on-sepolia) below moves both clerk checks into a Sepolia caveat for a new delegation. Whether the GenLayer verdict really is TRUE still rests on a named carrier.
+
 **What has been run.** `npm run simulate` starts a local [anvil](https://book.getfoundry.sh/anvil/) fork of Ethereum Sepolia, which includes MetaMask's deployed DelegationManager and enforcers. It uses throwaway keys that live only in memory and broadcasts nothing to any public network. Then it:
 - deploys the principal's smart account through `SimpleFactory`
 - funds it
@@ -121,6 +123,64 @@ Later the same day (22:52–22:53 UTC, 5:52–5:53 PM ET) a second run on public
 The agent paid R1's gas (about 2.5 million wei) from the fee it had received; the clerk paid R2's. No ETH moved in either transaction, and the principal's smart account held 0 ETH throughout, so nothing could have been paid under the fresh delegation: R1 shows the delegate (caller) check, not a funded payment being blocked.
 
 **What is now live and what is still not.** An outsider redemption and a second redemption have reverted on public Sepolia. A live FALSE or UNDETERMINED verdict has not: the only deployed case resolved TRUE, and no new GenLayer transactions were made, so those paths, and a redemption after expiry, are still covered only by the unit tests and the local fork. The clerk refusal in this run is a case-label mismatch decided by the clerk's code, not by a contract.
+
+### On-chain verdict check on Sepolia
+
+The two runs above leave the verdict gate and the case label to the clerk's code. A third run on 16 November 2026 (7:14–7:18 PM ET; 00:14–00:18 UTC on 17 November) moved both into a caveat that MetaMask's DelegationManager runs on-chain at redemption. The caveat is [`VerdictGateEnforcer`](partner/metamask/contracts/src/VerdictGateEnforcer.sol), 71 lines of Solidity with no owner, admin, upgrade or pause function. It was compiled with pinned solc 0.8.23 (optimizer, 200 runs) and deployed at [`0xfEf9…074a`](https://sepolia.etherscan.io/address/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a). Its source is verified on [Sourcify](https://repo.sourcify.dev/11155111/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a) (exact match, creation and runtime).
+
+How it works:
+- **Terms.** The caveat's terms are `abi.encode(caseKey, carrier)`, signed by the principal as part of the delegation. `caseKey` is the same case label as the salt: `keccak256(abi.encodePacked("internet-court-mandate-verdict", 4221, MandateVerdict address))`. `carrier` is the one account whose verdict post counts for this delegation.
+- **The gate.** `beforeHook` reverts with `VerdictGateEnforcer:verdict-not-true` unless `verdictTrue[carrier][caseKey]` is set.
+- **Posting.** `postVerdictTrue(genlayerChainId, caseContract)` records TRUE for `msg.sender` only. It computes the case key on-chain from the GenLayer chain id and contract address, emits `VerdictTrue`, and cannot be repeated or undone. There is no way to post FALSE, so deny is the default: on Sepolia, a FALSE case looks the same as one that was never posted.
+- **Who redeems.** The delegation goes straight to the agent, which is its delegate and only `redeemer`. The other caveats are unchanged: amount cap, exact payment to the agent, once, expiry (one day).
+
+**Who is still trusted.** This is not trustless, and the carrier is not an oracle. Ethereum Sepolia cannot read GenLayer, so the carrier is a trusted relayer: it is trusted to post TRUE only after reading a finalized TRUE verdict, and no contract on Sepolia checks that it did. The runner posts only when `get_verdict` returns `resolved` / `TRUE` and the case's `request_verdict` transaction is `Finalized` with `FinishedWithReturn` (both read-only GenLayer calls).
+
+What the chain now guarantees is narrower trust:
+- the carrier is named in the signed delegation;
+- it can open only this case, and only for delegations that name it;
+- it cannot change the amount, the recipient or any other limit, and cannot undo a post;
+- anyone can compare its post with the public `get_verdict`.
+
+A posted TRUE cannot be undone. After it, the principal's only remedies are to disable the delegation (`disableDelegation`) or let it expire. One post opens every delegation that names that carrier and that case: the once-only limit (`limitedCalls`) is per delegation, not per case.
+
+In this demo the carrier is the clerk's throwaway key, and the same operator held every key.
+
+| Step | Transaction | Block | Result |
+|---|---|---|---|
+| T1. The clerk deploys `VerdictGateEnforcer` | [`0x159d965f…`](https://sepolia.etherscan.io/tx/0x159d965f9ec998527090f4db4be6b52cba3c30914a0770eb7d09f9ec2ceae181) | 12150800 | success; on-chain runtime code equals the committed pinned artifact |
+| – The owner signs a delegation (hash `0xd4e773de…36e6`) from the principal's smart account [`0x2d00…C976`](https://sepolia.etherscan.io/address/0x2d006AF0f603CA2C2a6b8f9689A20E1dc65FC976) straight to the agent, with the verdict gate as caveat 3 of 7: this case, and carrier = the clerk [`0x906b…2D10`](https://sepolia.etherscan.io/address/0x906b4D9d64a5d4Bb559292A3f24562835a122D10) | no transaction | – | – |
+| T2. The clerk funds the smart account with the 0.001 ETH fee | [`0x15aaf077…`](https://sepolia.etherscan.io/tx/0x15aaf077f0459bee10c4e3665e2bbe31cfc594c348eb629a6c677359a3439f3f) | 12150801 | success |
+| T3. The agent [`0x8b5d…4929`](https://sepolia.etherscan.io/address/0x8b5deeE4A52c321C81C33b2bC99834EB05B04929) redeems before any verdict is posted on Sepolia | [`0x4ced2add…`](https://sepolia.etherscan.io/tx/0x4ced2add55d30f2207b0c50e77c75fb2cb55e4245e46be745afe3a616abba90d) | 12150817 | reverted: `VerdictGateEnforcer:verdict-not-true`; the funded fee stayed put |
+| T4. The clerk, as carrier, reads the finalized TRUE verdict and calls `postVerdictTrue(4221, 0x07E2…2F8B)` | [`0xfb9090a0…`](https://sepolia.etherscan.io/tx/0xfb9090a04b906512faf466c52a33c4c7ad4257429a1abf777723c6f3deac2423) | 12150818 | success; `VerdictTrue` event for this case |
+| T5. The agent redeems the same delegation itself | [`0xb5dd287b…`](https://sepolia.etherscan.io/tx/0xb5dd287b80fcb96bffefdbcaf1819652d92433ac78ad7032f7e9bf2be488955d) | 12150819 | success; the smart account paid exactly 0.001 ETH to the agent; `limitedCalls` count 1 |
+
+**How each step was checked.** Before anything was broadcast, the full flow was rehearsed on a local anvil fork of Sepolia; the fork's gas figures matched the live run to within 0.01%. Each live step was sent only if an `eth_call` simulation showed the expected outcome:
+- **T1:** the creation code returned exactly the committed runtime bytecode.
+- **T3:** the call reverted with `verdict-not-true`, *and* the same call with `verdictTrue` overridden to TRUE (an `eth_call` state override) succeeded. That was a simulation pinned at block 12150801 (T2's block, the state after T2), not a trace of the mined T3 at 12150817: in that pinned simulation, the gate was the only obstacle. `verify` re-ran both calls at 12150801, read-only, with the same result.
+- **T4:** the call returned the expected case key.
+- **T5:** the call succeeded.
+
+After mining, the runner checked:
+- the on-chain code equals the artifact;
+- T3's receipt is `reverted`, and a replay at its parent block gives the same reason;
+- the `VerdictTrue` event and the storage slot are set;
+- the smart account paid exactly the fee, and the agent received the fee minus its own gas.
+
+The runner caps itself at five transactions and never overwrites a record. The clerk paid T1, T2 and T4; the agent paid T3 and T5. Sepolia gas cost about 16 wei per unit at the time, so all five fees together came to 58,960,511 wei (about 0.00000006 ETH).
+
+**One abort, recorded.** The first attempt stopped after T2. A load-balanced public RPC node had returned the smart account's balance from a block before T2, which had in fact succeeded. The runner wrote what it had sent to an incomplete record and exited. A resume mode was then rehearsed on a fork and run live. It re-verified T1 and T2 on-chain, counted them against the same five-transaction budget, reused the delegation signed in the first attempt, and pinned every later read and simulation to an explicit block. Details are under `resumedFrom` in the record. Nonces (read-only, re-checked by `verify`): between the block before T1 and T5's block the clerk's nonce went 4 → 7 and the agent's 1 → 3, so exactly five transactions from these accounts were mined in that interval, the five in the record. The agent's nonce was still 1 at block 12150816, after T2, so no agent transaction was mined before the recorded T3. Nonces show only what was mined, not what was broadcast. That no T3 was broadcast before the abort rests on the run log and the code order: the first run threw at the T2 balance check, which comes before the T3 simulation and send, and its console log ([`live-onchain-check-run1.console.log`](partner/metamask/live-onchain-check-run1.console.log), committed verbatim) shows T1 and T2 sent and no T3. 
+
+Since then, review on #124 found that the older resume path could not tell "T3 never sent" from "T3 sent but not yet recorded" (not what happened here; see the run log and nonces above). The runner now journals each transaction's nonce before it is sent and its hash as soon as the send returns, before any check. A resume is allowed only when that journal and the chain's nonces and receipts agree that exactly T1 and T2 were sent and nothing is pending. It takes T2 from the journal, not the command line, and refuses anything else. Rehearsed on anvil forks: a crash after sending T3, and an unexplained clerk or agent nonce, are each refused.
+
+Records:
+- [`partner/metamask/live-onchain-check-result.json`](partner/metamask/live-onchain-check-result.json);
+- a read-only re-check, including the Sourcify lookup: [`live-onchain-check-verify.json`](partner/metamask/live-onchain-check-verify.json) (`node scripts/onchain-check.mjs verify`).
+
+Still not shown:
+- a live FALSE verdict;
+- a carrier and an agent run by different people;
+- verification on Etherscan's own verifier, which needs an account (Sourcify only).
 
 ## Architecture
 
@@ -180,7 +240,12 @@ npm test          # delegation shape, caveats, salt label, expiry, signature rec
 npm run simulate  # local anvil fork of Sepolia: deploy, fund, sign, read the live verdict, redeem
 npm run plan      # prints the three public-testnet transactions a live run would send
 node scripts/refusal.mjs plan   # prints the refusal run's steps (two deliberately reverting redemptions)
+npm run test:contracts          # Foundry: VerdictGateEnforcer unit tests + the committed artifact matches a fresh pinned build
+node scripts/onchain-check.mjs plan     # prints the on-chain verdict check's five transactions
+node scripts/onchain-check.mjs verify   # read-only re-check of the recorded on-chain check (and its Sourcify match)
 ```
+
+`npm test` includes a test that starts a plain local `anvil` (no fork) if it is on `PATH`, and skips it otherwise. CI installs Foundry v1.9.0.
 
 Optional contract tests (Python 3.11+). These use a local GenVM stand-in, not the live network:
 
@@ -222,7 +287,7 @@ Each transaction sends a fee deposit as `value`; unused budget is refunded at fi
 
 - **One case per contract.** A registry of many mandates would be a later revision.
 - **Live refusals are on-chain limits, not the verdict.** The outsider's and the repeat redemption that reverted on Sepolia show MetaMask's limits holding (only the clerk, only once). They do not show a live FALSE verdict, which has not occurred on this project's only deployed case.
-- **The settlement clerk is trusted.** `partner/metamask/` gates the MetaMask delegation on the verdict in off-chain code. MetaMask's caveat enforcers limit what the clerk can do (exact fee, to the named agent, once, before expiry), but no contract checks the GenLayer verdict or the case label (salt) on Sepolia, and the fee is not locked: it stays in the principal's own account until redemption. A trustless version would need an oracle or a bridge that carries the verdict to the EVM chain, plus a caveat enforcer that reads it.
+- **The settlement clerk is trusted in the payment run; the verdict carrier is trusted in the on-chain check.** In the payment run, `partner/metamask/` gates the MetaMask delegation on the verdict in off-chain code. MetaMask's caveat enforcers limit what the clerk can do (exact fee, to the named agent, once, before expiry), but no contract checks the GenLayer verdict or the case label (salt) on Sepolia. In the [on-chain verdict check](#on-chain-verdict-check-on-sepolia), `VerdictGateEnforcer` checks on Sepolia that the carrier named in the signed delegation posted TRUE for exactly this case. Sepolia still cannot read GenLayer, so the carrier is trusted to post only a finalized TRUE. In both, the fee is not locked: it stays in the principal's own account until redemption. A trustless version would need the verdict to reach the EVM side without a trusted party, for example GenLayer delivering it to the enforcer itself.
 - **Local tests use a v0.3-dev stand-in.** `tests/direct` runs the contract in genlayer-test's in-memory VM with mocked web and model responses. That environment is a v0.3-dev stand-in, not the exact Bradbury runner pinned in the contract header, and it is not a network consensus run. The on-chain proof above is the authoritative result.
 - **Submitted-URL binding is not the fetched page.** GenVM follows redirects and does not expose the final URL, so a bound URL can still lead the jury to a page the agent controls if that page is the redirect target. With prefix binding, the agent can also submit any path under the allowed prefix, including a page it controls there. See [Evidence-URL policy](#evidence-url-policy).
 - **Quote matching is normalized, and the model sees a truncated page.** See [Quote matching and page window](#quote-matching-and-page-window).

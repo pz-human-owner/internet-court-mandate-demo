@@ -1,0 +1,330 @@
+{
+  "contractName": "VerdictGateEnforcer",
+  "sourcePath": "contracts/src/VerdictGateEnforcer.sol",
+  "sourceSha256": "2453f1de43b3a254f2591c98ca00a7d8ed211537b0ea764d98a5589802f5ffb4",
+  "compiler": {
+    "solc": "0.8.23+commit.f704f362",
+    "evmVersion": "shanghai",
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    }
+  },
+  "abi": [
+    {
+      "type": "function",
+      "name": "CASE_LABEL",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "string",
+          "internalType": "string"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "afterAllHook",
+      "inputs": [
+        {
+          "name": "",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "pure"
+    },
+    {
+      "type": "function",
+      "name": "afterHook",
+      "inputs": [
+        {
+          "name": "",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "pure"
+    },
+    {
+      "type": "function",
+      "name": "beforeAllHook",
+      "inputs": [
+        {
+          "name": "",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "pure"
+    },
+    {
+      "type": "function",
+      "name": "beforeHook",
+      "inputs": [
+        {
+          "name": "terms",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "",
+          "type": "bytes",
+          "internalType": "bytes"
+        },
+        {
+          "name": "",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "caseKey",
+      "inputs": [
+        {
+          "name": "genlayerChainId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "caseContract",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "stateMutability": "pure"
+    },
+    {
+      "type": "function",
+      "name": "getTermsInfo",
+      "inputs": [
+        {
+          "name": "terms",
+          "type": "bytes",
+          "internalType": "bytes"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "key",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "carrier",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "pure"
+    },
+    {
+      "type": "function",
+      "name": "postVerdictTrue",
+      "inputs": [
+        {
+          "name": "genlayerChainId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "caseContract",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "key",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "verdictTrue",
+      "inputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool",
+          "internalType": "bool"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "event",
+      "name": "VerdictTrue",
+      "inputs": [
+        {
+          "name": "carrier",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "caseKey",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "genlayerChainId",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        },
+        {
+          "name": "caseContract",
+          "type": "address",
+          "indexed": false,
+          "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    }
+  ],
+  "bytecode": "0x608060405234801561000f575f80fd5b5061069f8061001d5f395ff3fe608060405234801561000f575f80fd5b5060043610610090575f3560e01c8063a145832a11610063578063a145832a14610123578063b496411114610136578063b99deb0e1461017f578063d3eddcc5146100f4578063ed463367146100f4575f80fd5b80630eefb7d814610094578063221e3c5d146100d3578063414c3e33146100f45780636ecf8d5814610110575b5f80fd5b6100be6100a2366004610437565b5f60208181529281526040808220909352908152205460ff1681565b60405190151581526020015b60405180910390f35b6100e66100e1366004610461565b6101af565b6040519081526020016100ca565b61010e6101023660046104d4565b50505050505050505050565b005b6100e661011e366004610461565b6102a2565b61010e6101313660046104d4565b61030b565b6101726040518060400160405280601e81526020017f696e7465726e65742d636f7572742d6d616e646174652d76657264696374000081525081565b6040516100ca91906105c0565b61019261018d3660046105f2565b6103a6565b604080519283526001600160a01b039091166020830152016100ca565b5f6101ba83836102a2565b335f9081526020818152604080832084845290915290205490915060ff16156102355760405162461bcd60e51b815260206004820152602260248201527f5665726469637447617465456e666f726365723a616c72656164792d706f7374604482015261195960f21b60648201526084015b60405180910390fd5b335f81815260208181526040808320858452825291829020805460ff1916600117905581518681526001600160a01b038616918101919091528392917fb7c857296c43b2df4bbd45cdfa03511ad3dc4d1a1d9c98104adb61ba08d9f34f910160405180910390a392915050565b5f6040518060400160405280601e81526020017f696e7465726e65742d636f7572742d6d616e646174652d76657264696374000081525083836040516020016102ed93929190610631565b60405160208183030381529060405280519060200120905092915050565b5f806103178c8c6103a6565b6001600160a01b0381165f90815260208181526040808320858452909152902054919350915060ff166103985760405162461bcd60e51b8152602060048201526024808201527f5665726469637447617465456e666f726365723a766572646963742d6e6f742d6044820152637472756560e01b606482015260840161022c565b505050505050505050505050565b5f80604083146104095760405162461bcd60e51b815260206004820152602860248201527f5665726469637447617465456e666f726365723a696e76616c69642d7465726d6044820152670e65ad8cadccee8d60c31b606482015260840161022c565b61041583850185610461565b909590945092505050565b6001600160a01b0381168114610434575f80fd5b50565b5f8060408385031215610448575f80fd5b823561045381610420565b946020939093013593505050565b5f8060408385031215610472575f80fd5b82359150602083013561048481610420565b809150509250929050565b5f8083601f84011261049f575f80fd5b50813567ffffffffffffffff8111156104b6575f80fd5b6020830191508360208285010111156104cd575f80fd5b9250929050565b5f805f805f805f805f8060e08b8d0312156104ed575f80fd5b8a3567ffffffffffffffff80821115610504575f80fd5b6105108e838f0161048f565b909c509a5060208d0135915080821115610528575f80fd5b6105348e838f0161048f565b909a50985060408d0135975060608d0135915080821115610553575f80fd5b506105608d828e0161048f565b90965094505060808b0135925060a08b013561057b81610420565b915060c08b013561058b81610420565b809150509295989b9194979a5092959850565b5f5b838110156105b85781810151838201526020016105a0565b50505f910152565b602081525f82518060208401526105de81604085016020870161059e565b601f01601f19169190910160400192915050565b5f8060208385031215610603575f80fd5b823567ffffffffffffffff811115610619575f80fd5b6106258582860161048f565b90969095509350505050565b5f845161064281846020890161059e565b919091019283525060601b6bffffffffffffffffffffffff1916602082015260340191905056fea26469706673582212201cd0cf2716b20598a6c448e65cc9696381534818e47315d8d693729e70993ae664736f6c63430008170033",
+  "deployedBytecode": "0x608060405234801561000f575f80fd5b5060043610610090575f3560e01c8063a145832a11610063578063a145832a14610123578063b496411114610136578063b99deb0e1461017f578063d3eddcc5146100f4578063ed463367146100f4575f80fd5b80630eefb7d814610094578063221e3c5d146100d3578063414c3e33146100f45780636ecf8d5814610110575b5f80fd5b6100be6100a2366004610437565b5f60208181529281526040808220909352908152205460ff1681565b60405190151581526020015b60405180910390f35b6100e66100e1366004610461565b6101af565b6040519081526020016100ca565b61010e6101023660046104d4565b50505050505050505050565b005b6100e661011e366004610461565b6102a2565b61010e6101313660046104d4565b61030b565b6101726040518060400160405280601e81526020017f696e7465726e65742d636f7572742d6d616e646174652d76657264696374000081525081565b6040516100ca91906105c0565b61019261018d3660046105f2565b6103a6565b604080519283526001600160a01b039091166020830152016100ca565b5f6101ba83836102a2565b335f9081526020818152604080832084845290915290205490915060ff16156102355760405162461bcd60e51b815260206004820152602260248201527f5665726469637447617465456e666f726365723a616c72656164792d706f7374604482015261195960f21b60648201526084015b60405180910390fd5b335f81815260208181526040808320858452825291829020805460ff1916600117905581518681526001600160a01b038616918101919091528392917fb7c857296c43b2df4bbd45cdfa03511ad3dc4d1a1d9c98104adb61ba08d9f34f910160405180910390a392915050565b5f6040518060400160405280601e81526020017f696e7465726e65742d636f7572742d6d616e646174652d76657264696374000081525083836040516020016102ed93929190610631565b60405160208183030381529060405280519060200120905092915050565b5f806103178c8c6103a6565b6001600160a01b0381165f90815260208181526040808320858452909152902054919350915060ff166103985760405162461bcd60e51b8152602060048201526024808201527f5665726469637447617465456e666f726365723a766572646963742d6e6f742d6044820152637472756560e01b606482015260840161022c565b505050505050505050505050565b5f80604083146104095760405162461bcd60e51b815260206004820152602860248201527f5665726469637447617465456e666f726365723a696e76616c69642d7465726d6044820152670e65ad8cadccee8d60c31b606482015260840161022c565b61041583850185610461565b909590945092505050565b6001600160a01b0381168114610434575f80fd5b50565b5f8060408385031215610448575f80fd5b823561045381610420565b946020939093013593505050565b5f8060408385031215610472575f80fd5b82359150602083013561048481610420565b809150509250929050565b5f8083601f84011261049f575f80fd5b50813567ffffffffffffffff8111156104b6575f80fd5b6020830191508360208285010111156104cd575f80fd5b9250929050565b5f805f805f805f805f8060e08b8d0312156104ed575f80fd5b8a3567ffffffffffffffff80821115610504575f80fd5b6105108e838f0161048f565b909c509a5060208d0135915080821115610528575f80fd5b6105348e838f0161048f565b909a50985060408d0135975060608d0135915080821115610553575f80fd5b506105608d828e0161048f565b90965094505060808b0135925060a08b013561057b81610420565b915060c08b013561058b81610420565b809150509295989b9194979a5092959850565b5f5b838110156105b85781810151838201526020016105a0565b50505f910152565b602081525f82518060208401526105de81604085016020870161059e565b601f01601f19169190910160400192915050565b5f8060208385031215610603575f80fd5b823567ffffffffffffffff811115610619575f80fd5b6106258582860161048f565b90969095509350505050565b5f845161064281846020890161059e565b919091019283525060601b6bffffffffffffffffffffffff1916602082015260340191905056fea26469706673582212201cd0cf2716b20598a6c448e65cc9696381534818e47315d8d693729e70993ae664736f6c63430008170033",
+  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.23+commit.f704f362\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"carrier\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"caseKey\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"genlayerChainId\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"caseContract\",\"type\":\"address\"}],\"name\":\"VerdictTrue\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"CASE_LABEL\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"afterAllHook\",\"outputs\":[],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"afterHook\",\"outputs\":[],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"beforeAllHook\",\"outputs\":[],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"terms\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"beforeHook\",\"outputs\":[],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"genlayerChainId\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"caseContract\",\"type\":\"address\"}],\"name\":\"caseKey\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"terms\",\"type\":\"bytes\"}],\"name\":\"getTermsInfo\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"key\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"carrier\",\"type\":\"address\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"genlayerChainId\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"caseContract\",\"type\":\"address\"}],\"name\":\"postVerdictTrue\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"key\",\"type\":\"bytes32\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"verdictTrue\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"NOT trustless and NOT an oracle. This chain cannot read GenLayer. The carrier is trusted to post      only a finalized TRUE verdict; this contract checks only that the carrier the delegator signed      for did post TRUE for exactly this case. What the carrier cannot do: post for another carrier,      change the amount, the recipient or any other caveat, or un-post. Deny is the default: there is      no way to post FALSE, so a case that never gets a TRUE from its carrier is never payable.      Terms: abi.encode(bytes32 caseKey, address carrier), exactly 64 bytes.      caseKey = keccak256(abi.encodePacked(\\\"internet-court-mandate-verdict\\\", genlayerChainId, caseContract)),      the same value the off-chain code uses as the delegation salt.      Standalone on purpose (no imports): the four hooks match ICaveatEnforcer of Delegation Framework      v1.3.0, where ModeCode is a bytes32 user-defined value type, so the selectors are identical.\",\"kind\":\"dev\",\"methods\":{},\"title\":\"VerdictGateEnforcer\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"beforeHook(bytes,bytes,bytes32,bytes,bytes32,address,address)\":{\"notice\":\"The gate. Called by the DelegationManager before the delegated execution runs.\"},\"caseKey(uint256,address)\":{\"notice\":\"The case key (delegation salt) for a GenLayer MandateVerdict contract.\"},\"getTermsInfo(bytes)\":{\"notice\":\"Decode caveat terms.\"},\"postVerdictTrue(uint256,address)\":{\"notice\":\"Record, as msg.sender, that this GenLayer case resolved TRUE. Only delegations whose         terms name msg.sender as the carrier are affected.\"},\"verdictTrue(address,bytes32)\":{\"notice\":\"carrier => caseKey => TRUE recorded. Write-once; never cleared.\"}},\"notice\":\"Caveat enforcer for MetaMask's Delegation Framework (ERC-7710). A delegation that carries         this caveat can be redeemed only after the carrier named in its terms has recorded, on this         chain, that the GenLayer case named in its terms resolved TRUE.\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"src/VerdictGateEnforcer.sol\":\"VerdictGateEnforcer\"},\"evmVersion\":\"shanghai\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"src/VerdictGateEnforcer.sol\":{\"keccak256\":\"0xfb2b6f0dd0441b77d27e67e2c3a1dee8ac7103ee302f1ee628edf0cca79439b8\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://e696bc5853e7f32d7f47dc98ae837fddd0fe114797f0b8380e063fdf282f4fa7\",\"dweb:/ipfs/QmPsEf6bNy7hJAiJXUuAKCQhLwtAV6PhbNu3C7kEU7ZJYD\"]}},\"version\":1}"
+}
