@@ -1,0 +1,5 @@
+pre  carrier may post: resolved TRUE, request_verdict Finalized (FinishedWithReturn)
+T1 sent 0x159d965f9ec998527090f4db4be6b52cba3c30914a0770eb7d09f9ec2ceae181
+T2 sent 0x15aaf077f0459bee10c4e3665e2bbe31cfc594c348eb629a6c677359a3439f3f
+wrote /workspace/ic-demo-live/partner/metamask/live-onchain-check-result.json.incomplete.json (2 tx sent)
+FAILED: T2: principal balance rose by 0, not 1000000000000000

@@ -1,4 +1,6 @@
-# Default gitleaks rules, plus one allowlisted public value in four named files (gitleaks >= 8.25).
+# Default gitleaks rules, plus one allowlisted public value in four named files.
+# Needs gitleaks >= 8.25 for [[allowlists]] with condition = "AND" (checked with gitleaks 8.28.0). An older binary may
+# ignore this table, which would only flag the value, never hide a leak. CI does not run gitleaks; pin the version if it does.
 [extend]
 useDefault = true
 

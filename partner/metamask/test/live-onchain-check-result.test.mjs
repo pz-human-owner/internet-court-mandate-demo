@@ -119,7 +119,7 @@ test('the abort-and-resume is recorded, not hidden', () => {
   assert.ok(r.editedAfterRun.changes.length >= 3);
 });
 
-test('nonces: clerk 4 -> 7 and agent 1 -> 3, exactly five transactions; the abort came before any T3', () => {
+test('nonces: clerk 4 -> 7 and agent 1 -> 3, exactly five transactions mined; no agent tx mined before T3; not-broadcast rests on the log', () => {
   const n = r.nonceVerification;
   assert.deepEqual(n.clerk.txNonces, { T1: 4, T2: 5, T4: 6 });
   assert.deepEqual(n.agent.txNonces, { T3: 1, T5: 2 });
@@ -134,4 +134,17 @@ test('nonces: clerk 4 -> 7 and agent 1 -> 3, exactly five transactions; the abor
   assert.deepEqual(vn.agent.txNonces, { T3_redeemBeforeVerdict: 1, T5_redeemAfterVerdict: 2 });
   assert.equal(n.clerk.nonceAtBlock12150799, vn.clerk.atBlock[b0]);
   assert.equal(n.agent.nonceAtBlock12150816, vn.agent.atBlock[b3]);
+  // Nonces prove mined history only; the not-broadcast claim cites the committed console log.
+  for (const c of [n.conclusion, vn.conclusion]) {
+    assert.match(c, /were mined in the checked interval/);
+    assert.match(c, /no agent transaction was mined before the recorded T3/);
+    assert.doesNotMatch(c, /was broadcast|no T3 was broadcast/);
+  }
+  assert.match(n.notBroadcastBeforeAbort, /run log and the code order, not on nonces/);
+  const log1 = readFileSync(new URL('../live-onchain-check-run1.console.log', import.meta.url), 'utf8');
+  assert.match(log1, new RegExp(`T1 sent ${t.T1_deployEnforcer.hash}\nT2 sent ${t.T2_fundPrincipal.hash}\n`));
+  assert.doesNotMatch(log1, /T3 sent/);
+  assert.match(log1, /FAILED: T2: principal balance rose by 0/);
+  const log2 = readFileSync(new URL('../live-onchain-check-run2.console.log', import.meta.url), 'utf8');
+  assert.equal((log2.match(/^T\d sent/gm) ?? []).join(','), 'T3 sent,T4 sent,T5 sent');
 });

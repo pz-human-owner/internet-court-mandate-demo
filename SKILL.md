@@ -224,7 +224,8 @@ names the block). Reads after each receipt are pinned to explicit blocks. Each s
 `<out>.journal.jsonl`: the sender's nonce before the send and the hash as soon as it returns, before any check. If a
 check fails after a broadcast, the runner writes `<out>.incomplete.json` and exits. `run --broadcast --resume
 <incomplete.json> --out <new.json>` continues only when the journal and the chain's nonces and receipts agree that
-exactly T1 and T2 were sent and nothing is pending; T2 comes from the journal. Anything else is refused.
+exactly T1 and T2 were sent and nothing is pending; T2 comes from the journal. Anything else is refused. An
+incomplete record is single-use: a second resume from the same file is refused.
 The agent pays the gas for its two redemptions, so the agent address needs a little Sepolia ETH.
 
 ## Verify

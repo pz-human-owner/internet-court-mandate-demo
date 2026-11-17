@@ -245,7 +245,8 @@
         "T5": 2
       }
     },
-    "conclusion": "Clerk 4 -> 7 and agent 1 -> 3 between the block before T1 and the block of T5: exactly 5 transactions from these accounts, the ones in this record. The agent nonce was still 1 at block 12150816, after T2 and before T3, so the abort came before any T3 was broadcast and nothing was sent twice."
+    "conclusion": "Clerk 4 -> 7 and agent 1 -> 3 between the block before T1 and the block of T5: exactly 5 transactions from these accounts were mined in the checked interval, the ones in this record. The agent nonce was still 1 at block 12150816, after T2 and before T3: no agent transaction was mined before the recorded T3. Nonces show mined history only.",
+    "notBroadcastBeforeAbort": "That no T3 was broadcast before the abort rests on the run log and the code order, not on nonces: the first run threw at the T2 post-receipt balance check, which runs before the T3 simulation, budget.take('T3') and the T3 send; its log shows 'T1 sent' and 'T2 sent' and no T3 line. Console logs, verbatim: live-onchain-check-run1.console.log (aborted run) and live-onchain-check-run2.console.log (resumed run)."
   },
   "balancesAfterWei": {
     "carrier": "1627999999921482076",
@@ -265,7 +266,8 @@
     "changes": [
       "resumedFrom.abortedAtUtc renamed priorRunStartedAtUtc (it always held the prior run start time, not an abort time); added priorRunAbortedAtStep and t2HashSource",
       "transactions.T3_redeemBeforeVerdict.counterfactual: the one-line string became an object that names the pinned simulation block (T2, 12150801) and qualifies \"the gate was the only obstacle\" as true of that simulation; the original text is kept as originalText",
-      "nonceVerification added"
+      "nonceVerification added",
+      "nonceVerification.conclusion narrowed to mined history (#124 round 2: ChatGPT, Grok); notBroadcastBeforeAbort added, citing the run log and code order; the two console logs committed verbatim"
     ]
   }
 }

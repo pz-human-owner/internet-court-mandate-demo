@@ -1,11 +1,11 @@
 // Send journal and resume reconciliation (src/send-journal.mjs). Offline: the chain is a plain object.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, appendFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { createJournal, readJournal, journalSends, reconcileResume, describeResume, journalPathFor } from '../src/send-journal.mjs';
+import { createJournal, readJournal, journalSends, reconcileResume, describeResume, journalPathFor, journaledSend, hashFromError, consumeRecord, consumedPathFor, isConsumed } from '../src/send-journal.mjs';
 
 const clerk = '0x906b4D9d64a5d4Bb559292A3f24562835a122D10';
 const agent = '0x8b5deeE4A52c321C81C33b2bC99834EB05B04929';
@@ -117,10 +117,82 @@ test('runner: --t2-hash is refused, and a resume file without a journal is refus
   assert.match(b.stderr, /not an aborted run with a send journal/);
 });
 
-test('runner source: each send journals its intent before and its hash right after sendTransaction, before any check', () => {
+test('runner source: every send goes through journaledSend with the pinned nonce; one sendTransaction call site', () => {
   const src = readFileSync(new URL('../scripts/onchain-check.mjs', import.meta.url), 'utf8');
   assert.equal((src.match(/\.sendTransaction\(/g) ?? []).length, 1, 'all sends go through one helper');
-  const m = src.match(/budget\.take\(stepName\);\s*journal\.intent\(stepName, accts\[who\], nonce\);\s*sendCount\[who\] \+= 1;\s*const h = await wallet\.sendTransaction\(\{ \.\.\.tx, nonce \}\);\s*journal\.sent\(stepName, h\);/);
-  assert.ok(m, 'intent -> send with pinned nonce -> sent, with nothing in between');
+  assert.match(src, /budget\.take\(stepName\);\s*sendCount\[who\] \+= 1;\s*const h = await journaledSend\(\{ journal, step: stepName, from: accts\[who\], nonce, doSend: \(\) => wallet\.sendTransaction\(\{ \.\.\.tx, nonce \}\) \}\);/);
   for (const st of ['T1', 'T2', 'T3', 'T4', 'T5']) assert.match(src, new RegExp(`await send\\('${st}'`));
+  // The record is consumed right after reconciliation, before `send` exists.
+  assert.ok(src.indexOf('consumeRecord(resume.priorPath') > 0 && src.indexOf('consumeRecord(resume.priorPath') < src.indexOf('const send = async'));
+});
+
+const openJournal = () => { const p = join(dir(), 'r.json.journal.jsonl'); return { p, j: createJournal(p, { accounts: { clerk, agent }, startNonces }) }; };
+
+test('journaledSend: intent, send, hash, in that order', async () => {
+  const { p, j } = openJournal();
+  const order = [];
+  const h = await journaledSend({ journal: j, step: 'T1', from: clerk, nonce: 4, doSend: async () => { order.push(readJournal(p).at(-1).event); return H(1); } });
+  assert.equal(h, H(1));
+  assert.deepEqual(order, ['intent'], 'the intent is on disk before the send runs');
+  assert.deepEqual(readJournal(p).map((e) => e.event), ['start', 'intent', 'sent']);
+});
+
+test('journal write fails before the send: nothing is sent', async () => {
+  const { p, j } = openJournal();
+  rmSync(p); mkdirSync(p); // the journal path is now a directory: every append fails (EISDIR), even as root
+  let sends = 0;
+  await assert.rejects(journaledSend({ journal: j, step: 'T1', from: clerk, nonce: 4, doSend: async () => { sends += 1; return H(1); } }), /EISDIR/);
+  assert.equal(sends, 0);
+});
+
+test('journal write fails after the send: the intent stays open and a resume refuses it as ambiguous', async () => {
+  const s = scenario([['T1', H(1)], ['T2', H(2)]]);
+  const real = createJournal(join(dir(), 'x.journal.jsonl'), { accounts: { clerk, agent }, startNonces });
+  const failing = { ...real, sent() { throw new Error('ENOSPC: no space left on device'); } };
+  let sends = 0;
+  await assert.rejects(journaledSend({ journal: failing, step: 'T3', from: agent, nonce: 1, doSend: async () => { sends += 1; return H(3); } }), /ENOSPC/);
+  assert.equal(sends, 1, 'sent exactly once, never retried');
+  const entries = [...s.entries, ...real.entries.slice(1)];
+  assert.deepEqual(journalSends(entries).at(-1), { step: 'T3', from: agent, nonce: 1, hash: null });
+  assert.throws(() => reconcileResume({ ...s, entries, chain: { ...s.chain, nonces: { ...s.chain.nonces, agent: { latest: 2, pending: 2 } } } }), /ambiguous send: T3 \(nonce 1\)/);
+});
+
+test('a send error that carries a hash is journaled before rethrowing; message text is never parsed', async () => {
+  const err = Object.assign(new Error('TransactionReceiptNotFound'), { cause: Object.assign(new Error('inner'), { transactionHash: H(7) }) });
+  assert.equal(hashFromError(err), H(7));
+  assert.equal(hashFromError({ hash: H(8) }), H(8));
+  assert.equal(hashFromError({ data: { hash: H(9) } }), H(9));
+  assert.equal(hashFromError(new Error(`execution reverted ${H(5)}`)), null);
+  assert.equal(hashFromError({ hash: '0x1234' }), null);
+  assert.equal(hashFromError(null), null);
+  const { p, j } = openJournal();
+  await assert.rejects(journaledSend({ journal: j, step: 'T3', from: agent, nonce: 1, doSend: async () => { throw err; } }), /TransactionReceiptNotFound/);
+  const last = readJournal(p).at(-1);
+  assert.equal(last.event, 'sent'); assert.equal(last.hash, H(7)); assert.match(last.fromError, /TransactionReceiptNotFound/);
+  // An error with no hash leaves the intent open (ambiguous).
+  const o = openJournal();
+  await assert.rejects(journaledSend({ journal: o.j, step: 'T3', from: agent, nonce: 1, doSend: async () => { throw new Error('socket hang up'); } }));
+  assert.equal(journalSends(readJournal(o.p)).at(-1).hash, null);
+});
+
+test('an incomplete record is single-use: the second consume is refused', () => {
+  const rec = join(dir(), 'run.json.incomplete.json');
+  writeFileSync(rec, '{}');
+  assert.equal(isConsumed(rec), false);
+  consumeRecord(rec, { by: '/tmp/resume-1.json' });
+  assert.equal(isConsumed(rec), true);
+  assert.equal(JSON.parse(readFileSync(consumedPathFor(rec), 'utf8')).by, '/tmp/resume-1.json');
+  assert.throws(() => consumeRecord(rec, { by: '/tmp/resume-2.json' }), /already used for a resume.*single-use/);
+});
+
+test('runner: a resume from an already-consumed record is refused before any network use', () => {
+  const script = new URL('../scripts/onchain-check.mjs', import.meta.url).pathname;
+  const d = dir();
+  const rec = join(d, 'run.json.incomplete.json');
+  writeFileSync(rec, JSON.stringify({ aborted: 'x', journal: 'run.json.journal.jsonl', startNonces, transactions: {} }));
+  writeFileSync(consumedPathFor(rec), '{}\n');
+  const r = spawnSync(process.execPath, [script, 'run', '--broadcast', '--resume', rec, '--out', join(d, 'o.json')], { encoding: 'utf8', env: { SEPOLIA_RPC_URL: 'http://127.0.0.1:9' } });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /already used for a resume; an incomplete record is single-use/);
+  assert.equal(existsSync(join(d, 'o.json.journal.jsonl')), false);
 });

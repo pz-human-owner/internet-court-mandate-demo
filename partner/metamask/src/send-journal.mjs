@@ -7,7 +7,7 @@
 //   {"event":"sent","step":"T3","hash":"0x…"}                 as soon as the send returns, before any check
 // A resume is allowed only after reconciling that journal against the chain (sender nonces and receipts),
 // and only from the one supported point: exactly T1 and T2 sent and mined. Anything else is refused.
-import { openSync, writeSync, fsyncSync, closeSync, readFileSync } from 'node:fs';
+import { openSync, writeSync, fsyncSync, closeSync, readFileSync, existsSync } from 'node:fs';
 import { getAddress } from 'viem';
 import { GateError } from './refusal-gate.mjs';
 
@@ -36,8 +36,50 @@ export function createJournal(path, { accounts, startNonces, prior = [] }) {
     path,
     entries,
     intent(step, from, nonce) { put({ event: 'intent', step, from: getAddress(from), nonce: Number(nonce), atUtc: new Date().toISOString() }); },
-    sent(step, hash) { put({ event: 'sent', step, hash, atUtc: new Date().toISOString() }); },
+    sent(step, hash, extra = {}) { put({ event: 'sent', step, hash, ...extra, atUtc: new Date().toISOString() }); },
   };
+}
+
+/**
+ * A transaction hash carried by a send error (viem and JSON-RPC errors may carry one when the node accepted
+ * the transaction but something after that failed). Only fields named `hash` / `transactionHash` along the
+ * `cause` chain count; message text is never parsed, so an unrelated 32-byte value cannot be mistaken for one.
+ */
+export function hashFromError(e) {
+  const isHash = (v) => typeof v === 'string' && /^0x[0-9a-fA-F]{64}$/.test(v);
+  for (let x = e, i = 0; x && typeof x === 'object' && i < 10; x = x.cause, i++) {
+    for (const k of ['hash', 'transactionHash']) if (isHash(x[k])) return x[k];
+    if (isHash(x.data?.hash)) return x.data.hash;
+  }
+  return null;
+}
+
+/**
+ * The one send path: durable intent, then the send, then the durable hash. If the intent cannot be written,
+ * nothing is sent. If the send throws with a hash, that hash is journaled before the error is rethrown. If the
+ * hash cannot be written after a send, the intent stays open and any resume refuses it as an ambiguous send.
+ */
+export async function journaledSend({ journal, step, from, nonce, doSend }) {
+  journal.intent(step, from, nonce);
+  let h;
+  try { h = await doSend(); } catch (e) {
+    const eh = hashFromError(e);
+    if (eh) journal.sent(step, eh, { fromError: String(e?.shortMessage ?? e?.message ?? e).slice(0, 200) });
+    throw e;
+  }
+  journal.sent(step, h);
+  return h;
+}
+
+/** An incomplete record is single-use: `<record>.consumed` is created with O_EXCL before a resume may send. */
+export const consumedPathFor = (recordPath) => `${recordPath}.consumed`;
+export const isConsumed = (recordPath) => existsSync(consumedPathFor(recordPath));
+export function consumeRecord(recordPath, { by }) {
+  try { appendDurable(consumedPathFor(recordPath), { event: 'consumed', record: recordPath, by, atUtc: new Date().toISOString() }, 'wx'); }
+  catch (e) {
+    if (e.code === 'EEXIST') throw new GateError(`resume: ${recordPath} was already used for a resume (${consumedPathFor(recordPath)} exists); an incomplete record is single-use. Refusing.`);
+    throw e;
+  }
 }
 
 export function readJournal(path) {

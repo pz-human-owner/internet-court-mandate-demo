@@ -3,3 +3,4 @@ node_modules/
 signed-delegation.json
 *.journal.jsonl
 *.incomplete.json
+*.consumed
