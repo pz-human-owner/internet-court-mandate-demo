@@ -6,7 +6,7 @@ import { getAddress } from 'viem';
 import { getSmartAccountsEnvironment } from '@metamask/smart-accounts-kit';
 import { caseSalt, hashDelegation, SAMPLE_CASE } from '../src/verdict-payment.mjs';
 import { decodeRevertData } from '../src/refusal-gate.mjs';
-import { GATE_REVERT, decodeGateTerms } from '../src/verdict-gate.mjs';
+import { GATE_REVERT, decodeGateTerms, verdictSlot } from '../src/verdict-gate.mjs';
 
 const r = JSON.parse(readFileSync(new URL('../live-onchain-check-result.json', import.meta.url), 'utf8'));
 const v = JSON.parse(readFileSync(new URL('../live-onchain-check-verify.json', import.meta.url), 'utf8'));
@@ -79,7 +79,14 @@ test('T3: the agent is blocked by the gate before a verdict is posted, and only 
   assert.equal(x.replayAtParentBlock.decoded, GATE_REVERT);
   assert.equal(v.results.T3_redeemBeforeVerdict.replayDecoded, GATE_REVERT);
   assert.equal(getAddress(x.blockedByAddress), getAddress(r.enforcer.address));
-  assert.match(x.counterfactual, /overridden to TRUE succeeded/);
+  // The counterfactual is a pinned simulation at T2's block, not a trace of the mined T3; the claim says so.
+  assert.equal(x.counterfactual.block, t.T2_fundPrincipal.block);
+  assert.equal(x.counterfactual.minedT3Block, x.block);
+  assert.equal(x.counterfactual.withoutOverride, GATE_REVERT);
+  assert.equal(x.counterfactual.withOverride, 'success');
+  assert.equal(x.counterfactual.override.slot, verdictSlot(r.accounts.carrier, r.case.caseKey));
+  assert.match(x.counterfactual.claim, new RegExp(`^In this pinned simulation at block ${t.T2_fundPrincipal.block}, .*in that simulation the gate was the only obstacle`));
+  assert.deepEqual(v.results.counterfactualReplay, { block: t.T2_fundPrincipal.block, withoutOverride: GATE_REVERT, withOverride: 'success' });
   assert.ok(x.gasUsed < x.gasLimit, 'reverted with gas left (not out of gas)');
 });
 
@@ -106,4 +113,25 @@ test('T5: the agent redeemed the same delegation itself and got exactly the fee 
 test('the abort-and-resume is recorded, not hidden', () => {
   assert.match(r.resumedFrom.explanation, /stale read/);
   assert.match(r.resumedFrom.abortReason, /^T2: principal balance rose by 0/);
+  // The field is named for what it holds: the prior run's start time (equal to this record's start).
+  assert.ok(!('abortedAtUtc' in r.resumedFrom));
+  assert.equal(r.resumedFrom.priorRunStartedAtUtc, r.startedAtUtc);
+  assert.ok(r.editedAfterRun.changes.length >= 3);
+});
+
+test('nonces: clerk 4 -> 7 and agent 1 -> 3, exactly five transactions; the abort came before any T3', () => {
+  const n = r.nonceVerification;
+  assert.deepEqual(n.clerk.txNonces, { T1: 4, T2: 5, T4: 6 });
+  assert.deepEqual(n.agent.txNonces, { T3: 1, T5: 2 });
+  for (const k of order) assert.equal(t[k].nonce ?? null, null, 'transaction fields unchanged after the run');
+  const vn = v.results.nonces;
+  assert.equal(getAddress(vn.clerk.address), getAddress(r.accounts.carrier));
+  assert.equal(getAddress(vn.agent.address), getAddress(r.accounts.agent));
+  const b0 = t.T1_deployEnforcer.block - 1, b3 = t.T3_redeemBeforeVerdict.block - 1, b5 = t.T5_redeemAfterVerdict.block;
+  assert.deepEqual(vn.clerk.atBlock, { [b0]: 4, [b5]: 7 });
+  assert.deepEqual(vn.agent.atBlock, { [b0]: 1, [b3]: 1, [b5]: 3 });
+  assert.deepEqual(vn.clerk.txNonces, { T1_deployEnforcer: 4, T2_fundPrincipal: 5, T4_postVerdictTrue: 6 });
+  assert.deepEqual(vn.agent.txNonces, { T3_redeemBeforeVerdict: 1, T5_redeemAfterVerdict: 2 });
+  assert.equal(n.clerk.nonceAtBlock12150799, vn.clerk.atBlock[b0]);
+  assert.equal(n.agent.nonceAtBlock12150816, vn.agent.atBlock[b3]);
 });

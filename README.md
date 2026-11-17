@@ -142,6 +142,8 @@ What the chain now guarantees is narrower trust:
 - it cannot change the amount, the recipient or any other limit, and cannot undo a post;
 - anyone can compare its post with the public `get_verdict`.
 
+A posted TRUE cannot be undone. After it, the principal's only remedies are to disable the delegation (`disableDelegation`) or let it expire. One post opens every delegation that names that carrier and that case: the once-only limit (`limitedCalls`) is per delegation, not per case.
+
 In this demo the carrier is the clerk's throwaway key, and the same operator held every key.
 
 | Step | Transaction | Block | Result |
@@ -155,7 +157,7 @@ In this demo the carrier is the clerk's throwaway key, and the same operator hel
 
 **How each step was checked.** Before anything was broadcast, the full flow was rehearsed on a local anvil fork of Sepolia; the fork's gas figures matched the live run to within 0.01%. Each live step was sent only if an `eth_call` simulation showed the expected outcome:
 - **T1:** the creation code returned exactly the committed runtime bytecode.
-- **T3:** the call reverted with `verdict-not-true`, *and* the same call with `verdictTrue` overridden to TRUE (an `eth_call` state override) succeeded. So the gate was the only obstacle.
+- **T3:** the call reverted with `verdict-not-true`, *and* the same call with `verdictTrue` overridden to TRUE (an `eth_call` state override) succeeded. That was a simulation pinned at block 12150801 (T2's block, the state after T2), not a trace of the mined T3 at 12150817: in that pinned simulation, the gate was the only obstacle. `verify` re-ran both calls at 12150801, read-only, with the same result.
 - **T4:** the call returned the expected case key.
 - **T5:** the call succeeded.
 
@@ -167,7 +169,9 @@ After mining, the runner checked:
 
 The runner caps itself at five transactions and never overwrites a record. The clerk paid T1, T2 and T4; the agent paid T3 and T5. Sepolia gas cost about 16 wei per unit at the time, so all five fees together came to 58,960,511 wei (about 0.00000006 ETH).
 
-**One abort, recorded.** The first attempt stopped after T2. A load-balanced public RPC node had returned the smart account's balance from a block before T2, which had in fact succeeded. The runner wrote what it had sent to an incomplete record and exited. A resume mode was then rehearsed on a fork and run live. It re-verified T1 and T2 on-chain, counted them against the same five-transaction budget, reused the delegation signed in the first attempt, and pinned every later read and simulation to an explicit block. Details are under `resumedFrom` in the record.
+**One abort, recorded.** The first attempt stopped after T2. A load-balanced public RPC node had returned the smart account's balance from a block before T2, which had in fact succeeded. The runner wrote what it had sent to an incomplete record and exited. A resume mode was then rehearsed on a fork and run live. It re-verified T1 and T2 on-chain, counted them against the same five-transaction budget, reused the delegation signed in the first attempt, and pinned every later read and simulation to an explicit block. Details are under `resumedFrom` in the record. Nonces confirm it (read-only, re-checked by `verify`): between the block before T1 and T5's block the clerk's nonce went 4 → 7 and the agent's 1 → 3, so exactly these five transactions were sent. The agent's nonce was still 1 at block 12150816, after T2, so the abort came before any T3 was broadcast. 
+
+Since then, review on #124 found that the older resume path could not tell "T3 never sent" from "T3 sent but not yet recorded" (not what happened here; see the nonces). The runner now journals each transaction's nonce before it is sent and its hash as soon as the send returns, before any check. A resume is allowed only when that journal and the chain's nonces and receipts agree that exactly T1 and T2 were sent and nothing is pending. It takes T2 from the journal, not the command line, and refuses anything else. Rehearsed on anvil forks: a crash after sending T3, and an unexplained clerk or agent nonce, are each refused.
 
 Records:
 - [`partner/metamask/live-onchain-check-result.json`](partner/metamask/live-onchain-check-result.json);

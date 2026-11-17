@@ -105,6 +105,10 @@ test('panel has On-chain verdict check rows: five Sepolia transactions, the enfo
 
 test('on-chain check wording names who is still trusted and never claims trustless', () => {
   assert.match(panel, /<b>Not trustless\.<\/b>/);
+  // A post is final, the principal's remedies are named, and one post opens every matching delegation.
+  assert.match(panel, /A posted TRUE cannot be undone/);
+  assert.match(panel, /<code>disableDelegation<\/code>\) or let it expire/);
+  assert.match(panel, /One post opens every delegation that names that carrier and that case; the once-only limit is per delegation, not per case\./);
   assert.match(panel, /trusted relayer, not an oracle/);
   assert.match(panel, /carrier is trusted in T1–T5/);
   assert.match(panel, /cannot read GenLayer/);

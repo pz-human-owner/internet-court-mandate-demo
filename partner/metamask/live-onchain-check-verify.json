@@ -1,7 +1,7 @@
 {
-  "method": "read-only: eth_getCode, eth_getTransactionReceipt, eth_getTransactionByHash, eth_call replay at the parent block, verdictTrue(), Sourcify lookup; no transactions",
+  "method": "read-only: eth_getCode, eth_getTransactionReceipt, eth_getTransactionByHash, eth_getTransactionCount at fixed blocks, eth_call replay at the parent block, the T3 counterfactual eth_call at its recorded block, verdictTrue(), Sourcify lookup; no transactions",
   "rpc": "https://ethereum-sepolia-rpc.publicnode.com",
-  "atUtc": "2026-11-17T00:19:40.530Z",
+  "atUtc": "2026-11-17T00:59:16.054Z",
   "passed": true,
   "results": {
     "enforcerCodeMatchesArtifact": true,
@@ -30,6 +30,38 @@
       "hash": "0xb5dd287b80fcb96bffefdbcaf1819652d92433ac78ad7032f7e9bf2be488955d",
       "status": "success",
       "block": 12150819
+    },
+    "nonces": {
+      "clerk": {
+        "address": "0x906b4D9d64a5d4Bb559292A3f24562835a122D10",
+        "atBlock": {
+          "12150799": 4,
+          "12150819": 7
+        },
+        "txNonces": {
+          "T1_deployEnforcer": 4,
+          "T2_fundPrincipal": 5,
+          "T4_postVerdictTrue": 6
+        }
+      },
+      "agent": {
+        "address": "0x8b5deeE4A52c321C81C33b2bC99834EB05B04929",
+        "atBlock": {
+          "12150799": 1,
+          "12150816": 1,
+          "12150819": 3
+        },
+        "txNonces": {
+          "T3_redeemBeforeVerdict": 1,
+          "T5_redeemAfterVerdict": 2
+        }
+      },
+      "conclusion": "clerk 4 -> 7 and agent 1 -> 3 between blocks 12150799 and 12150819: exactly 5 transactions from these accounts; the agent's nonce was still 1 at block 12150816, so no T3 was broadcast before the recorded one"
+    },
+    "counterfactualReplay": {
+      "block": 12150801,
+      "withoutOverride": "VerdictGateEnforcer:verdict-not-true",
+      "withOverride": "success"
     },
     "verdictTrue": true,
     "sourcify": {

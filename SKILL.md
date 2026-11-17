@@ -107,7 +107,7 @@ the same six are in the payment and refusal runs; the on-chain check in step 6 a
 
 | # | Caveat (enforcer) | Terms | Effect |
 |---|---|---|---|
-| 1 | `exactCalldata` ([`0x99F2…BdED`](https://sepolia.etherscan.io/address/0x99F2e9bF15ce5eC84685604836F71aB835DBBdED), ExactCalldataEnforcer) | `0x` | added by the `nativeTokenTransferAmount` scope: requires empty calldata; no function call (a plain ETH transfer) |
+| 1 | `exactCalldata` ([`0x99F2…BdED`](https://sepolia.etherscan.io/address/0x99F2e9bF15ce5eC84685604836F71aB835DBBdED), ExactCalldataEnforcer) | `0x` | added by the `nativeTokenTransferAmount` scope: requires empty calldata; no function calldata (a plain ETH transfer) |
 | 2 | `nativeTokenTransferAmount` ([`0xF71a…0320`](https://sepolia.etherscan.io/address/0xF71af580b9c3078fbc2BBF16FbB8EEd82b330320)) | `amountWei` | at most `amountWei` in total |
 | 3 | `exactExecution` ([`0x1467…bfbb`](https://sepolia.etherscan.io/address/0x146713078D39eCC1F5338309c28405ccf85Abfbb)) | agent, `amountWei`, `0x` | the only call allowed is "send exactly `amountWei` to `agent`" |
 | 4 | `redeemer` ([`0xE144…65c5`](https://sepolia.etherscan.io/address/0xE144b0b2618071B4E56f746313528a669c7E65c5)); the delegate is also the clerk | clerk | nobody but the clerk can redeem |
@@ -176,7 +176,10 @@ signed terms** has called `postVerdictTrue(4221, caseContract)` on the enforcer.
 `abi.encode(caseKey, carrier)`, and `caseKey` is the same value as the salt. The verdict gate and the case match
 become chain rules, so the agent can be the delegate and redeem for itself. **It is not trustless:** Sepolia cannot
 read GenLayer, so the carrier is a trusted relayer, not an oracle, trusted to post only a finalized `TRUE`. It
-cannot post FALSE, change the amount, the recipient or any other limit, post for another carrier, or undo a post.
+cannot post FALSE, change the amount, the recipient or any other limit, or post for another carrier.
+A posted TRUE cannot be undone: after it, the principal's only remedies are `disableDelegation` or letting the
+delegation expire. One post opens every delegation that names that carrier and that case; the once-only limit
+(`limitedCalls`) is per delegation, not per case.
 
 ```js
 // save as partner/metamask/my-gated.mjs and run (from the repo root): node partner/metamask/my-gated.mjs
@@ -216,9 +219,12 @@ blocked redemption, the carrier's post, the paid redemption) and refuses to send
 
 Each step is sent only if its `eth_call` simulation shows the expected outcome. The blocked redemption must revert
 with `VerdictGateEnforcer:verdict-not-true` and must succeed with `verdictTrue` overridden to TRUE (an `eth_call`
-state override), so the gate is the only obstacle. Reads after each receipt are pinned to explicit blocks. If a check
-fails after a broadcast, the runner writes `<out>.incomplete.json` and exits. `run --broadcast --resume
-<incomplete.json> --t2-hash <0x…>` continues an abort that happened after T2, within the same five-transaction budget.
+state override) in a simulation pinned at T2's block, so in that simulation the gate is the only obstacle (the record
+names the block). Reads after each receipt are pinned to explicit blocks. Each send is journaled to
+`<out>.journal.jsonl`: the sender's nonce before the send and the hash as soon as it returns, before any check. If a
+check fails after a broadcast, the runner writes `<out>.incomplete.json` and exits. `run --broadcast --resume
+<incomplete.json> --out <new.json>` continues only when the journal and the chain's nonces and receipts agree that
+exactly T1 and T2 were sent and nothing is pending; T2 comes from the journal. Anything else is refused.
 The agent pays the gas for its two redemptions, so the agent address needs a little Sepolia ETH.
 
 ## Verify
@@ -247,8 +253,9 @@ The agent pays the gas for its two redemptions, so the agent address needs a lit
   more, pay twice, or pay after expiry.
 - **The carrier is trusted for the verdict (step 6).** With `VerdictGateEnforcer` the gate and the case match are checked
   on-chain, but whether the GenLayer verdict really is `TRUE` rests on the carrier named in the signed delegation. It is a
-  trusted relayer, not an oracle, and this is not trustless. In the recorded run the carrier was the clerk's throwaway
-  key, and one operator held every key.
+  trusted relayer, not an oracle, and this is not trustless. A posted TRUE cannot be undone (the principal can only
+  `disableDelegation` or let it expire), and one post opens every delegation naming that carrier and case. In the
+  recorded run the carrier was the clerk's throwaway key, and one operator held every key.
 - **Not an escrow.** The fee stays in the principal's smart account until redemption; the owner can move it out first.
 - **Live coverage.** On Sepolia: one paid redemption, plus an outsider's redemption and a repeat redemption that both reverted, plus a gated redemption that was blocked before the verdict was posted and paid after. A live `FALSE` or `UNDETERMINED` verdict
   and an expired redemption are covered by the unit tests and the local fork, not on a public chain.
