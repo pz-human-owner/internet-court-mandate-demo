@@ -1,11 +1,11 @@
 // Send journal and resume reconciliation (src/send-journal.mjs). Offline: the chain is a plain object.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, appendFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, appendFileSync, rmSync, mkdirSync, existsSync, copyFileSync, renameSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { createJournal, readJournal, journalSends, reconcileResume, describeResume, journalPathFor, journaledSend, hashFromError, consumeRecord, consumedPathFor, isConsumed } from '../src/send-journal.mjs';
+import { createJournal, readJournal, journalSends, reconcileResume, describeResume, journalPathFor, journaledSend, hashFromError, consumeRecord, consumedPathFor, consumedReason, resumeIdentity } from '../src/send-journal.mjs';
 
 const clerk = '0x906b4D9d64a5d4Bb559292A3f24562835a122D10';
 const agent = '0x8b5deeE4A52c321C81C33b2bC99834EB05B04929';
@@ -122,7 +122,8 @@ test('runner source: every send goes through journaledSend with the pinned nonce
   assert.equal((src.match(/\.sendTransaction\(/g) ?? []).length, 1, 'all sends go through one helper');
   assert.match(src, /budget\.take\(stepName\);\s*sendCount\[who\] \+= 1;\s*const h = await journaledSend\(\{ journal, step: stepName, from: accts\[who\], nonce, doSend: \(\) => wallet\.sendTransaction\(\{ \.\.\.tx, nonce \}\) \}\);/);
   for (const st of ['T1', 'T2', 'T3', 'T4', 'T5']) assert.match(src, new RegExp(`await send\\('${st}'`));
-  // The record is consumed right after reconciliation, before `send` exists.
+  // The record is consumed (content + run ledger) right after reconciliation, before `send` exists.
+  assert.ok(src.includes('consumeRecord(resume.priorPath, { by: outPath, id: resume.id })'));
   assert.ok(src.indexOf('consumeRecord(resume.priorPath') > 0 && src.indexOf('consumeRecord(resume.priorPath') < src.indexOf('const send = async'));
 });
 
@@ -175,24 +176,70 @@ test('a send error that carries a hash is journaled before rethrowing; message t
   assert.equal(journalSends(readJournal(o.p)).at(-1).hash, null);
 });
 
-test('an incomplete record is single-use: the second consume is refused', () => {
-  const rec = join(dir(), 'run.json.incomplete.json');
-  writeFileSync(rec, '{}');
-  assert.equal(isConsumed(rec), false);
-  consumeRecord(rec, { by: '/tmp/resume-1.json' });
-  assert.equal(isConsumed(rec), true);
-  assert.equal(JSON.parse(readFileSync(consumedPathFor(rec), 'utf8')).by, '/tmp/resume-1.json');
-  assert.throws(() => consumeRecord(rec, { by: '/tmp/resume-2.json' }), /already used for a resume.*single-use/);
+/** An aborted run on disk: incomplete record + its journal, in a fresh dir. */
+function abortedRun(d = dir()) {
+  const journal = createJournal(join(d, 'run.json.journal.jsonl'), { accounts: { clerk, agent }, startNonces });
+  journal.intent('T1', clerk, 4); journal.sent('T1', H(1)); journal.intent('T2', clerk, 5); journal.sent('T2', H(2));
+  const rec = join(d, 'run.json.incomplete.json');
+  writeFileSync(rec, JSON.stringify({ aborted: 'x', abortedAtStep: 'T2', journal: 'run.json.journal.jsonl', startNonces, startedAtUtc: '2026-11-17T00:00:00.000Z', transactions: {} }, null, 2) + '\n');
+  return { d, rec, jpath: journal.path, id: resumeIdentity(readFileSync(rec), readJournal(journal.path)) };
+}
+
+test('single-use: the second consume of the same record is refused', () => {
+  const ledger = dir();
+  const { rec, id } = abortedRun();
+  assert.equal(consumedReason(rec, id, ledger), null);
+  consumeRecord(rec, { by: '/tmp/resume-1.json', id, ledgerDir: ledger });
+  assert.deepEqual(readdirSync(ledger).sort(), [`content-${id.contentSha256}.json`, `run-${id.runId}.json`]);
+  assert.equal(JSON.parse(readFileSync(join(ledger, `run-${id.runId}.json`), 'utf8')).by, '/tmp/resume-1.json');
+  assert.ok(existsSync(consumedPathFor(rec)));
+  assert.throws(() => consumeRecord(rec, { by: '/tmp/resume-2.json', id, ledgerDir: ledger }), /cannot be resumed: its run .* was already resumed once.*single-use/);
 });
 
-test('runner: a resume from an already-consumed record is refused before any network use', () => {
+test('single-use survives a copy, a rename, a deleted marker and an edited copy (ledger keyed by content and run)', () => {
+  const ledger = dir();
+  const a = abortedRun();
+  consumeRecord(a.rec, { by: 'first', id: a.id, ledgerDir: ledger });
+  // Copy record + journal to another directory: same content, same run.
+  const d2 = dir();
+  copyFileSync(a.rec, join(d2, 'run.json.incomplete.json')); copyFileSync(a.jpath, join(d2, 'run.json.journal.jsonl'));
+  const idCopy = resumeIdentity(readFileSync(join(d2, 'run.json.incomplete.json')), readJournal(join(d2, 'run.json.journal.jsonl')));
+  assert.deepEqual(idCopy, a.id);
+  assert.match(consumedReason(join(d2, 'run.json.incomplete.json'), idCopy, ledger), /already resumed once/);
+  assert.throws(() => consumeRecord(join(d2, 'run.json.incomplete.json'), { by: 'copy', id: idCopy, ledgerDir: ledger }), /single-use/);
+  // Rename in place.
+  const renamed = join(a.d, 'renamed.incomplete.json');
+  renameSync(a.rec, renamed);
+  assert.match(consumedReason(renamed, resumeIdentity(readFileSync(renamed), readJournal(a.jpath)), ledger), /already resumed once/);
+  // Delete the path-local marker: the ledger still refuses.
+  rmSync(consumedPathFor(a.rec));
+  assert.match(consumedReason(renamed, a.id, ledger), /already resumed once/);
+  // Edit the record (new content hash): the run id is unchanged, still refused.
+  const edited = join(a.d, 'edited.incomplete.json');
+  writeFileSync(edited, readFileSync(renamed, 'utf8').replace('"aborted": "x"', '"aborted": "y"'));
+  const idEdited = resumeIdentity(readFileSync(edited), readJournal(a.jpath));
+  assert.notEqual(idEdited.contentSha256, a.id.contentSha256);
+  assert.equal(idEdited.runId, a.id.runId);
+  assert.throws(() => consumeRecord(edited, { by: 'edited', id: idEdited, ledgerDir: ledger }), /already resumed once/);
+  // A different run is unaffected.
+  const b = abortedRun();
+  const other = createJournal(join(dir(), 'j.jsonl'), { accounts: { clerk, agent }, startNonces: { ...startNonces, clerk: { address: clerk, nonce: 10 } } });
+  assert.notEqual(resumeIdentity(readFileSync(b.rec), other.entries).runId, a.id.runId);
+});
+
+test('runner: resuming a consumed record, a copy of it, or after deleting its marker is refused before any network use', () => {
   const script = new URL('../scripts/onchain-check.mjs', import.meta.url).pathname;
-  const d = dir();
-  const rec = join(d, 'run.json.incomplete.json');
-  writeFileSync(rec, JSON.stringify({ aborted: 'x', journal: 'run.json.journal.jsonl', startNonces, transactions: {} }));
-  writeFileSync(consumedPathFor(rec), '{}\n');
-  const r = spawnSync(process.execPath, [script, 'run', '--broadcast', '--resume', rec, '--out', join(d, 'o.json')], { encoding: 'utf8', env: { SEPOLIA_RPC_URL: 'http://127.0.0.1:9' } });
-  assert.equal(r.status, 2);
-  assert.match(r.stderr, /already used for a resume; an incomplete record is single-use/);
-  assert.equal(existsSync(join(d, 'o.json.journal.jsonl')), false);
+  const ledger = dir();
+  const a = abortedRun();
+  consumeRecord(a.rec, { by: 'first', id: a.id, ledgerDir: ledger });
+  const run = (rec) => spawnSync(process.execPath, [script, 'run', '--broadcast', '--resume', rec, '--out', join(dir(), 'o.json')], { encoding: 'utf8', env: { SEPOLIA_RPC_URL: 'http://127.0.0.1:9', ONCHAIN_CHECK_LEDGER_DIR: ledger } });
+  let r = run(a.rec);
+  assert.equal(r.status, 2); assert.match(r.stderr, /cannot be resumed: its run .* already resumed once.*single-use/);
+  const d2 = dir();
+  copyFileSync(a.rec, join(d2, 'copy.incomplete.json')); copyFileSync(a.jpath, join(d2, 'run.json.journal.jsonl'));
+  r = run(join(d2, 'copy.incomplete.json'));
+  assert.equal(r.status, 2); assert.match(r.stderr, /already resumed once/);
+  rmSync(consumedPathFor(a.rec));
+  r = run(a.rec);
+  assert.equal(r.status, 2); assert.match(r.stderr, /already resumed once/);
 });

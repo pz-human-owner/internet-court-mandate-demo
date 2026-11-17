@@ -225,7 +225,9 @@ names the block). Reads after each receipt are pinned to explicit blocks. Each s
 check fails after a broadcast, the runner writes `<out>.incomplete.json` and exits. `run --broadcast --resume
 <incomplete.json> --out <new.json>` continues only when the journal and the chain's nonces and receipts agree that
 exactly T1 and T2 were sent and nothing is pending; T2 comes from the journal. Anything else is refused. An
-incomplete record is single-use: a second resume from the same file is refused.
+incomplete record is single-use by content and run (a ledger in `~/.onchain-check/consumed-resumes`), so a second
+resume, from a copy, a renamed file or after deleting a marker, is refused. Do not copy, rename or edit an incomplete
+record, or delete its markers, to resume it again.
 The agent pays the gas for its two redemptions, so the agent address needs a little Sepolia ETH.
 
 ## Verify

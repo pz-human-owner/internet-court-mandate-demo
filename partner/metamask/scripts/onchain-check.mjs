@@ -30,8 +30,10 @@
 // `run --broadcast --resume <incomplete.json> --out <new.json>` continues only from one point: the journal and
 // the chain (nonces, receipts) agree that exactly T1 and T2 were sent and mined and nothing is pending. Any
 // other state (a send with no hash, T3 already broadcast, a nonce the journal does not explain) is refused.
-// T2 is taken from the journal, not from the command line. An incomplete record is single-use: <record>.consumed is
-// created (O_EXCL) after reconciliation and before the resumed run sends anything; a second resume is refused.
+// T2 is taken from the journal, not from the command line. An incomplete record is single-use by content and by run:
+// after reconciliation and before the resumed run can send, run-<runId> and content-<sha256> markers are created
+// (O_EXCL) in a fixed ledger (~/.onchain-check/consumed-resumes), so a copy, rename, edit or deleted marker is refused.
+// Do not copy, rename or edit an incomplete record, or delete its markers, to resume it again.
 // If a send throws an error that carries a hash, that hash is journaled before the error is rethrown.
 //
 // Inputs (partner/metamask/.env, gitignored; `set -a; . ./.env; set +a`): OWNER_KEY, CLERK_KEY,
@@ -48,7 +50,7 @@ import { GateError, rpcCall, simulateExpectedRevert, verifyMinedRevert, decodeRe
 import { redeemCalldata, hashDelegation, caseSalt, SAMPLE_CASE, GENLAYER_BRADBURY_CHAIN_ID } from '../src/verdict-payment.mjs';
 import { makeVerdictReader, DEFAULT_GENLAYER_RPC } from '../src/genlayer-verdict.mjs';
 import { ARTIFACT, GATE_ABI, GATE_REVERT, SLOT_TRUE, buildGatedDelegation, carrierDecision, checkSuccess, gateTerms, txBudget, verdictSlot } from '../src/verdict-gate.mjs';
-import { createJournal, readJournal, journalSends, reconcileResume, describeResume, journalPathFor, journaledSend, consumeRecord, isConsumed, SENDER } from '../src/send-journal.mjs';
+import { createJournal, readJournal, journalSends, reconcileResume, describeResume, journalPathFor, journaledSend, consumeRecord, consumedReason, resumeIdentity, SENDER } from '../src/send-journal.mjs';
 
 // The GenLayer transaction id of the sample case's request_verdict (see proof/README.md).
 export const REQUEST_VERDICT_TXID = '0xe6b05c9f31f84392c0bac5d94cb8df1f107634f61bd3ba0ce8c056710e1517d8';
@@ -142,7 +144,7 @@ async function flow({ rpcUrl, outPath, label, resume, rehearsal = false }) {
     }
     reconciled = reconcileResume({ prior: resume.prior, entries, chain });
     // Single-use: mark the incomplete record consumed (O_EXCL) before this run can send anything.
-    consumeRecord(resume.priorPath, { by: outPath });
+    consumeRecord(resume.priorPath, { by: outPath, id: resume.id });
     console.log('resume reconciled: T1', reconciled.t1.hash, 'T2', reconciled.t2.hash, `clerk nonce ${reconciled.nonces.clerk}, agent nonce ${reconciled.nonces.agent}`);
   }
   let startNonces;
@@ -406,8 +408,11 @@ function parseResume() {
     const priorPath = resolve(process.argv[ri + 1]);
     const prior = JSON.parse(readFileSync(priorPath, 'utf8'));
     if (!prior.aborted || !prior.journal || !prior.startNonces) { console.error('resume file is not an aborted run with a send journal'); process.exit(2); }
-    if (isConsumed(priorPath)) { console.error(`resume file ${priorPath} was already used for a resume; an incomplete record is single-use`); process.exit(2); }
-    resume = { prior, priorPath, journalPath: resolve(dirname(priorPath), prior.journal) };
+    const journalPath = resolve(dirname(priorPath), prior.journal);
+    const id = resumeIdentity(readFileSync(priorPath), readJournal(journalPath));
+    const why = consumedReason(priorPath, id);
+    if (why) { console.error(`resume file ${priorPath} cannot be resumed: ${why}; an incomplete record is single-use`); process.exit(2); }
+    resume = { prior, priorPath, journalPath, id };
   }
   return resume;
 }
