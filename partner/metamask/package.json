@@ -8,7 +8,10 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "simulate": "node scripts/simulate-fork.mjs --out sim-result.json",
-    "plan": "node scripts/live.mjs plan"
+    "plan": "node scripts/live.mjs plan",
+    "test:contracts": "cd contracts && forge test && cd .. && node scripts/export-enforcer-artifact.mjs --check",
+    "onchain:plan": "node scripts/onchain-check.mjs plan",
+    "onchain:verify": "node scripts/onchain-check.mjs verify"
   },
   "dependencies": {
     "@metamask/delegation-abis": "2.0.0",

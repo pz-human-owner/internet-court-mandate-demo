@@ -1,0 +1,43 @@
+{
+  "method": "read-only: eth_getCode, eth_getTransactionReceipt, eth_getTransactionByHash, eth_call replay at the parent block, verdictTrue(), Sourcify lookup; no transactions",
+  "rpc": "https://ethereum-sepolia-rpc.publicnode.com",
+  "atUtc": "2026-11-17T00:19:40.530Z",
+  "passed": true,
+  "results": {
+    "enforcerCodeMatchesArtifact": true,
+    "T1_deployEnforcer": {
+      "hash": "0x159d965f9ec998527090f4db4be6b52cba3c30914a0770eb7d09f9ec2ceae181",
+      "status": "success",
+      "block": 12150800
+    },
+    "T2_fundPrincipal": {
+      "hash": "0x15aaf077f0459bee10c4e3665e2bbe31cfc594c348eb629a6c677359a3439f3f",
+      "status": "success",
+      "block": 12150801
+    },
+    "T3_redeemBeforeVerdict": {
+      "hash": "0x4ced2add55d30f2207b0c50e77c75fb2cb55e4245e46be745afe3a616abba90d",
+      "status": "reverted",
+      "block": 12150817,
+      "replayDecoded": "VerdictGateEnforcer:verdict-not-true"
+    },
+    "T4_postVerdictTrue": {
+      "hash": "0xfb9090a04b906512faf466c52a33c4c7ad4257429a1abf777723c6f3deac2423",
+      "status": "success",
+      "block": 12150818
+    },
+    "T5_redeemAfterVerdict": {
+      "hash": "0xb5dd287b80fcb96bffefdbcaf1819652d92433ac78ad7032f7e9bf2be488955d",
+      "status": "success",
+      "block": 12150819
+    },
+    "verdictTrue": true,
+    "sourcify": {
+      "match": "exact_match",
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "verifiedAt": "2026-11-17T00:19:14Z",
+      "repo": "https://repo.sourcify.dev/11155111/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a"
+    }
+  }
+}

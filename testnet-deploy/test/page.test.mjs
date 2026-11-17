@@ -28,7 +28,7 @@ test('panel links the three live Sepolia transactions and live-result.json', () 
 });
 
 test('panel carries the honesty notes from the README', () => {
-  assert.match(panel, /clerk is trusted/i);
+  assert.match(panel, /clerk is trusted in A–C/i);
   assert.match(panel, /isn't an escrow/i);
   assert.match(panel, /same operator held/i);
   assert.match(panel, /FALSE or UNDETERMINED verdict/);
@@ -79,4 +79,35 @@ test('refusal badge and notes do not call the clerk\'s repeat redemption unautho
   assert.match(panel, /<code>exactCalldata<\/code>/);
   assert.match(panel, /requires empty calldata; no function call/);
   assert.doesNotMatch(panel, /cannot call a contract/);
+});
+
+test('panel has On-chain verdict check rows: five Sepolia transactions, the enforcer and its records', () => {
+  const s = panel.indexOf('id="onchain-rows"');
+  assert.ok(s > panel.indexOf('id="refusal-rows"'));
+  const rows = panel.slice(s, panel.indexOf('</tbody>', s));
+  assert.match(rows, /On-chain verdict check on Sepolia/);
+  for (const h of [
+    '0x159d965f9ec998527090f4db4be6b52cba3c30914a0770eb7d09f9ec2ceae181',
+    '0x15aaf077f0459bee10c4e3665e2bbe31cfc594c348eb629a6c677359a3439f3f',
+    '0x4ced2add55d30f2207b0c50e77c75fb2cb55e4245e46be745afe3a616abba90d',
+    '0xfb9090a04b906512faf466c52a33c4c7ad4257429a1abf777723c6f3deac2423',
+    '0xb5dd287b80fcb96bffefdbcaf1819652d92433ac78ad7032f7e9bf2be488955d',
+  ]) assert.ok(rows.includes(`https://sepolia.etherscan.io/tx/${h}`), h);
+  assert.equal((rows.match(/Reverted on-chain/g) ?? []).length, 1);
+  assert.match(rows, /VerdictGateEnforcer:verdict-not-true/);
+  assert.ok(rows.includes('https://sepolia.etherscan.io/address/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a'));
+  assert.ok(rows.includes('https://repo.sourcify.dev/11155111/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a'));
+  assert.match(panel, /partner\/metamask\/live-onchain-check-result\.json/);
+  assert.match(panel, /contracts\/src\/VerdictGateEnforcer\.sol/);
+  const footer = html.slice(html.indexOf('<pre id="log">'));
+  assert.ok(footer.includes('#onchain-rows'));
+});
+
+test('on-chain check wording names who is still trusted and never claims trustless', () => {
+  assert.match(panel, /<b>Not trustless\.<\/b>/);
+  assert.match(panel, /trusted relayer, not an oracle/);
+  assert.match(panel, /carrier is trusted in T1–T5/);
+  assert.match(panel, /cannot read GenLayer/);
+  assert.doesNotMatch(panel.replace(/Not trustless/g, ''), /trustless|trust-minimi[sz]ed|oracle-free|decentrali[sz]ed oracle/i);
+  assert.doesNotMatch(panel.replace(/not an oracle|no oracle between them/g, ''), /\boracle\b/i);
 });
