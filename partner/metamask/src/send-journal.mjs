@@ -7,7 +7,10 @@
 //   {"event":"sent","step":"T3","hash":"0x…"}                 as soon as the send returns, before any check
 // A resume is allowed only after reconciling that journal against the chain (sender nonces and receipts),
 // and only from the one supported point: exactly T1 and T2 sent and mined. Anything else is refused.
-import { openSync, writeSync, fsyncSync, closeSync, readFileSync, existsSync } from 'node:fs';
+import { openSync, writeSync, fsyncSync, closeSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { getAddress } from 'viem';
 import { GateError } from './refusal-gate.mjs';
 
@@ -71,14 +74,44 @@ export async function journaledSend({ journal, step, from, nonce, doSend }) {
   return h;
 }
 
-/** An incomplete record is single-use: `<record>.consumed` is created with O_EXCL before a resume may send. */
+/**
+ * An incomplete record is single-use, by content and by run, not by path.
+ * Identity: `contentSha256` = sha256 of the record's bytes; `runId` = sha256 of the journal's start entry
+ * (accounts, start nonces, start time), which a copy, rename or edit of the record cannot change.
+ * Consumption is recorded in a fixed per-machine ledger directory (default ~/.onchain-check/consumed-resumes,
+ * override ONCHAIN_CHECK_LEDGER_DIR) as `run-<runId>.json` and `content-<sha>.json`, each created with O_EXCL,
+ * before a resumed run can send. The path-local `<record>.consumed` marker is kept as a second, local check.
+ * Boundary: the ledger is per machine; the pinned-nonce guard (resume refuses unless the chain's nonces match the
+ * journal) still applies everywhere.
+ */
 export const consumedPathFor = (recordPath) => `${recordPath}.consumed`;
-export const isConsumed = (recordPath) => existsSync(consumedPathFor(recordPath));
-export function consumeRecord(recordPath, { by }) {
-  try { appendDurable(consumedPathFor(recordPath), { event: 'consumed', record: recordPath, by, atUtc: new Date().toISOString() }, 'wx'); }
-  catch (e) {
-    if (e.code === 'EEXIST') throw new GateError(`resume: ${recordPath} was already used for a resume (${consumedPathFor(recordPath)} exists); an incomplete record is single-use. Refusing.`);
-    throw e;
+export const defaultLedgerDir = () => process.env.ONCHAIN_CHECK_LEDGER_DIR || join(homedir(), '.onchain-check', 'consumed-resumes');
+const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
+export function resumeIdentity(recordBytes, journalEntries) {
+  const start = journalEntries?.[0];
+  if (start?.event !== 'start') throw new GateError('resume: journal has no start entry');
+  const runId = sha256(JSON.stringify({ accounts: start.accounts, startNonces: start.startNonces, atUtc: start.atUtc }));
+  return { contentSha256: sha256(recordBytes), runId };
+}
+const ledgerFiles = (dir, id) => [join(dir, `run-${id.runId}.json`), join(dir, `content-${id.contentSha256}.json`)];
+/** Why this record may not be resumed, or null. Read-only. */
+export function consumedReason(recordPath, id, ledgerDir = defaultLedgerDir()) {
+  const [runF, contentF] = ledgerFiles(ledgerDir, id);
+  if (existsSync(runF)) return `its run (runId ${id.runId.slice(0, 16)}…) was already resumed once (ledger ${runF})`;
+  if (existsSync(contentF)) return `a record with the same content (sha256 ${id.contentSha256.slice(0, 16)}…) was already used (ledger ${contentF})`;
+  if (existsSync(consumedPathFor(recordPath))) return `${consumedPathFor(recordPath)} exists`;
+  return null;
+}
+export const isConsumed = (recordPath, id, ledgerDir) => consumedReason(recordPath, id, ledgerDir) !== null;
+export function consumeRecord(recordPath, { by, id, ledgerDir = defaultLedgerDir() }) {
+  if (!id?.runId || !id?.contentSha256) throw new GateError('resume: consumeRecord needs the record identity');
+  mkdirSync(ledgerDir, { recursive: true, mode: 0o700 });
+  const entry = { event: 'consumed', record: recordPath, by, runId: id.runId, contentSha256: id.contentSha256, atUtc: new Date().toISOString() };
+  const refuse = (why) => new GateError(`resume: ${recordPath} cannot be resumed: ${why}; an incomplete record is single-use. Refusing.`);
+  // The run marker is the atomic claim: O_EXCL, so two concurrent resumes of the same run cannot both pass.
+  for (const f of [...ledgerFiles(ledgerDir, id), consumedPathFor(recordPath)]) {
+    try { appendDurable(f, entry, 'wx'); }
+    catch (e) { if (e.code === 'EEXIST') throw refuse(consumedReason(recordPath, id, ledgerDir) ?? `${f} exists`); throw e; }
   }
 }
 

@@ -172,6 +172,92 @@ export function viewContractAddress(search = '', fallback = DEFAULT_CONTRACT) {
   return { address: fallback, isDefault: true };
 }
 
+/** Case statuses returned by get_status and get_verdict.status. */
+export const CASE_STATUS_OPEN = 'open';
+export const CASE_STATUS_SUBMITTED = 'submitted';
+export const CASE_STATUS_RESOLVED = 'resolved';
+
+/**
+ * Normalize a get_status result or a get_verdict / get_case object (or JSON
+ * string) to the bare status string: open, submitted, or resolved.
+ */
+export function normalizeCaseStatus(raw) {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.status != null) {
+    return String(raw.status).trim();
+  }
+  if (typeof raw !== 'string') return raw == null || raw === '' ? '' : String(raw).trim();
+  const t = raw.trim();
+  if (t.startsWith('{')) {
+    try {
+      const o = JSON.parse(t);
+      if (o && typeof o === 'object' && !Array.isArray(o) && o.status != null) return String(o.status).trim();
+    } catch { /* not a JSON object */ }
+  }
+  if (t.startsWith('"') && t.endsWith('"')) {
+    try { return String(JSON.parse(t)).trim(); } catch { /* keep the trimmed string */ }
+  }
+  return t;
+}
+
+/**
+ * Optional ?step= hint used only when on-chain status cannot be read.
+ * `submit` resumes at submit_deliverable; anything else (including absent or
+ * malformed) defaults to `verdict` for backward compatibility with the
+ * previous resume behavior, which always unlocked request_verdict.
+ */
+export function resumeStepParam(search = '') {
+  let q = null;
+  try { q = new URLSearchParams(search).get('step'); } catch { q = null; }
+  return q === 'submit' ? 'submit' : 'verdict';
+}
+
+/**
+ * Which MetaMask send step to unlock when resuming an already-deployed
+ * contract after Estimate. `status` is get_status (or get_verdict.status).
+ * Previous steps are marked done on the one-shot gate so they cannot be
+ * sent again; only the next unsent write is enabled.
+ *
+ * - open: no deliverable yet → claim deploy, enable submit
+ * - submitted: deliverable in, no final verdict → claim deploy+submit, enable verdict
+ * - resolved: verdict final → claim all three, enable nothing, show the verdict
+ */
+export function resumeFromStatus(status) {
+  const s = normalizeCaseStatus(status);
+  if (s === CASE_STATUS_OPEN) {
+    return Object.freeze({
+      status: s,
+      claim: Object.freeze(['deploy']),
+      enable: 'submit',
+      showVerdict: false,
+      log: 'Resume mode: contract already deployed, no deliverable submitted; only submit_deliverable is enabled',
+    });
+  }
+  if (s === CASE_STATUS_SUBMITTED) {
+    return Object.freeze({
+      status: s,
+      claim: Object.freeze(['deploy', 'submit']),
+      enable: 'verdict',
+      showVerdict: false,
+      log: 'Resume mode: contract already deployed and deliverable submitted; only request_verdict is enabled',
+    });
+  }
+  if (s === CASE_STATUS_RESOLVED) {
+    return Object.freeze({
+      status: s,
+      claim: Object.freeze(['deploy', 'submit', 'verdict']),
+      enable: null,
+      showVerdict: true,
+      log: 'Resume mode: contract already has a final verdict; no further send is enabled',
+    });
+  }
+  throw new Error(`Resume: unknown case status ${JSON.stringify(status)}; not enabling any send step`);
+}
+
+/** Map a ?step= fallback (when get_status cannot be read) onto resumeFromStatus. */
+export function resumeFromStepParam(step) {
+  return resumeFromStatus(step === 'submit' ? CASE_STATUS_OPEN : CASE_STATUS_SUBMITTED);
+}
+
 function parseJsonObject(raw, what) {
   let o = raw;
   if (typeof raw === 'string') {

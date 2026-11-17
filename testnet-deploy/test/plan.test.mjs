@@ -6,6 +6,8 @@ import {
   liveFeesOrAbort, sendConfirmText, shouldUnlockAfterEstimate,
   DEFAULT_CONTRACT, VIEW_FUNCTIONS, isAddress, viewContractAddress, parseVerdict, parseCase,
   RECORDED_RUN, recordedTxLinks, withTimeout, explorerAddress,
+  CASE_STATUS_OPEN, CASE_STATUS_SUBMITTED, CASE_STATUS_RESOLVED,
+  normalizeCaseStatus, resumeStepParam, resumeFromStatus, resumeFromStepParam,
 } from '../src/plan.mjs';
 
 const ME = '0x1111111111111111111111111111111111111111';
@@ -125,3 +127,81 @@ test('withTimeout rejects a hung read and passes a fast one through', async () =
   assert.equal(await withTimeout(Promise.resolve(7), 50), 7);
   await assert.rejects(() => withTimeout(new Promise(() => {}), 20, 'get_verdict'), /get_verdict timed out after 20 ms/);
 });
+
+test('normalizeCaseStatus accepts get_status strings and get_verdict objects', () => {
+  assert.equal(normalizeCaseStatus('open'), 'open');
+  assert.equal(normalizeCaseStatus(' submitted '), 'submitted');
+  assert.equal(normalizeCaseStatus('"resolved"'), 'resolved');
+  assert.equal(normalizeCaseStatus({ status: 'open', verdict: '' }), 'open');
+  assert.equal(normalizeCaseStatus(JSON.stringify({ status: 'submitted', verdict: '' })), 'submitted');
+  assert.equal(normalizeCaseStatus(''), '');
+  assert.equal(normalizeCaseStatus(undefined), '');
+});
+
+test('resumeStepParam: only step=submit is explicit; default is verdict', () => {
+  assert.equal(resumeStepParam(''), 'verdict');
+  assert.equal(resumeStepParam('?contract=' + ME), 'verdict');
+  assert.equal(resumeStepParam('?contract=' + ME + '&step=verdict'), 'verdict');
+  assert.equal(resumeStepParam('?step=submit&contract=' + ME), 'submit');
+  assert.equal(resumeStepParam('?step=SUBMIT'), 'verdict');
+  assert.equal(resumeStepParam('?step=open'), 'verdict');
+  assert.equal(resumeStepParam('?step='), 'verdict');
+});
+
+test('resumeFromStatus: open enables only submit; previous steps stay one-shot', () => {
+  const action = resumeFromStatus('open');
+  assert.deepEqual(action, {
+    status: CASE_STATUS_OPEN,
+    claim: ['deploy'],
+    enable: 'submit',
+    showVerdict: false,
+    log: 'Resume mode: contract already deployed, no deliverable submitted; only submit_deliverable is enabled',
+  });
+  const g = createStepGate();
+  for (const id of action.claim) g.claim(id);
+  assert.equal(g.isDone('deploy'), true);
+  assert.equal(g.isDone('submit'), false);
+  assert.throws(() => g.claim('deploy'), /already sent/);
+  assert.throws(() => g.claim('verdict'), /submit must finish/);
+  g.claim('submit');
+  g.claim('verdict');
+  assert.throws(() => g.claim('submit'), /already sent/);
+});
+
+test('resumeFromStatus: submitted enables only request_verdict', () => {
+  const action = resumeFromStatus({ status: 'submitted' });
+  assert.deepEqual([...action.claim], ['deploy', 'submit']);
+  assert.equal(action.enable, 'verdict');
+  assert.equal(action.showVerdict, false);
+  assert.match(action.log, /only request_verdict is enabled/);
+  const g = createStepGate();
+  for (const id of action.claim) g.claim(id);
+  assert.throws(() => g.claim('submit'), /already sent/);
+  g.claim('verdict');
+  assert.throws(() => g.claim('verdict'), /already sent/);
+});
+
+test('resumeFromStatus: resolved enables nothing and asks to show the verdict', () => {
+  const action = resumeFromStatus('"resolved"');
+  assert.deepEqual([...action.claim], ['deploy', 'submit', 'verdict']);
+  assert.equal(action.enable, null);
+  assert.equal(action.showVerdict, true);
+  assert.match(action.log, /final verdict; no further send is enabled/);
+  const g = createStepGate();
+  for (const id of action.claim) g.claim(id);
+  assert.throws(() => g.claim('verdict'), /already sent/);
+  assert.throws(() => g.claim('submit'), /already sent/);
+});
+
+test('resumeFromStatus rejects an unknown status so no send is unlocked', () => {
+  assert.throws(() => resumeFromStatus(''), /unknown case status/);
+  assert.throws(() => resumeFromStatus('pending'), /unknown case status/);
+  assert.throws(() => resumeFromStatus(undefined), /unknown case status/);
+});
+
+test('resumeFromStepParam maps URL fallback onto the same open/submitted actions', () => {
+  assert.deepEqual(resumeFromStepParam('submit'), resumeFromStatus('open'));
+  assert.deepEqual(resumeFromStepParam('verdict'), resumeFromStatus('submitted'));
+  assert.deepEqual(resumeFromStepParam('anything-else'), resumeFromStatus(CASE_STATUS_SUBMITTED));
+});
+
