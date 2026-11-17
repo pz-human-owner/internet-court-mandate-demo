@@ -13,6 +13,7 @@ import {
   viewContractAddress, parseVerdict, parseCase, RECORDED_RUN, recordedTxLinks, withTimeout,
   resumeFromStatus, resumeOnReadFailure, normalizeCaseStatus,
 } from './plan.mjs';
+import { CHECKS, ADDR, runChecks, outcomeLabel } from './breakit.mjs';
 
 const $ = (id) => document.getElementById(id);
 const gate = createStepGate();
@@ -359,3 +360,56 @@ async function showRecorded(address, isDefault, err) {
 
 $('v-refresh').addEventListener('click', () => { viewLive(); });
 viewLive();
+
+// "Try to break it": read-only eth_call / gen_call checks (src/breakit.mjs). No wallet, nothing sent.
+const breakState = { busy: false };
+function breakRow(check) {
+  const tr = document.createElement('tr');
+  tr.id = `break-${check.id}`;
+  const a = document.createElement('td'); a.textContent = check.title;
+  const w = document.createElement('small'); w.textContent = check.why; a.append(w);
+  const h = document.createElement('td'); h.textContent = check.how;
+  const o = document.createElement('td'); o.className = 'out pending'; o.textContent = 'waiting…';
+  tr.append(a, h, o);
+  return tr;
+}
+function showBreakResult(check, r) {
+  const td = document.querySelector(`#break-${check.id} td.out`);
+  if (!td) return;
+  td.className = `out ${r.outcome}`;
+  td.textContent = outcomeLabel(r.outcome);
+  const d = document.createElement('small');
+  d.textContent = r.reason ? `revert: ${r.reason}` : (r.detail || '');
+  td.append(d);
+}
+async function runBreakIt() {
+  if (breakState.busy) return;
+  breakState.busy = true;
+  $('break-run').disabled = true;
+  $('break-rows').replaceChildren(...CHECKS.map(breakRow));
+  $('break-status').className = 'pending';
+  $('break-status').textContent = 'Running read-only checks against public Sepolia and Bradbury RPCs…';
+  const rpcFor = (url) => async (method, params) => {
+    const r = await withTimeout(fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) }), 15000, method);
+    if (!r.ok) throw new Error(`${method}: HTTP ${r.status}`);
+    return r.json();
+  };
+  const reader = createClient({ chain: testnetBradbury, endpoint: BRADBURY.defaultGenlayerRpcUrl });
+  const readFalseVerdict = async () => parseVerdict(await withTimeout(reader.readContract({ address: ADDR.falseCase, functionName: 'get_verdict', args: [] }), VIEW_TIMEOUT_MS, 'get_verdict'));
+  try {
+    const results = await runChecks({ rpcFor, readFalseVerdict, onResult: showBreakResult });
+    const ok = results.filter((r) => r.outcome === 'refused' || r.outcome === 'opened').length;
+    const bad = results.filter((r) => r.outcome === 'unexpected').length;
+    $('break-status').className = bad ? 'unexpected' : (ok === results.length ? 'refused' : 'error');
+    $('break-status').textContent = `${ok} of ${results.length} checks behaved as expected${bad ? `, ${bad} unexpected` : ''}${ok + bad < results.length ? `, ${results.length - ok - bad} could not be checked` : ''} (${new Date().toLocaleTimeString()}, read-only).`;
+    log('Try to break it: results (read-only eth_call / gen_call; nothing sent)', results);
+  } catch (e) {
+    $('break-status').className = 'error';
+    $('break-status').textContent = `Checks could not run: ${e.message || e}`;
+  } finally {
+    breakState.busy = false;
+    $('break-run').disabled = false;
+  }
+}
+$('break-run').addEventListener('click', () => { runBreakIt(); });
+runBreakIt();

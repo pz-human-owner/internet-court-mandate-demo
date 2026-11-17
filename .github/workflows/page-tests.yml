@@ -1,0 +1,27 @@
+# Network-free unit tests and build of the demo page (testnet-deploy/) on pull requests.
+# The Pages workflow runs the same steps, but only after a push to main. No secrets, no deploy.
+name: page tests
+
+on:
+  pull_request:
+    paths: ['testnet-deploy/**', 'partner/metamask/*.json', '.github/workflows/page-tests.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: testnet-deploy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: testnet-deploy/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
