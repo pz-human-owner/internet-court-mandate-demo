@@ -1,7 +1,7 @@
 # Internet Court Mandate Demo
 
 **Live demo (no wallet needed):** https://pz-human-owner.github.io/internet-court-mandate-demo/  
-**Demo video (44 s):** [mission101_demo_v4s.mp4](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/download/v1.2-demo/mission101_demo_v4s.mp4) on the [v1.2-demo release](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/tag/v1.2-demo)  
+**Demo video (44 s):** [mission101_demo_v5.mp4](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/download/v1.3-demo/mission101_demo_v5.mp4) on the [v1.3-demo release](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/tag/v1.3-demo)  
 **Reuse it:** [`SKILL.md`](SKILL.md), an agent skill that walks through reading a verdict, opening a case, and building, settling and refusing the MetaMask delegation
 
 A principal writes a mandate, binds the evidence a jury may read, and appoints an agent. The agent submits a deliverable. A [GenLayer](https://docs.genlayer.com/) Intelligent Contract then acts as an [Internet Court](https://internetcourt.org/)-style jury: validators fetch a page at the submitted source URL and record whether the deliverable met the mandate.
