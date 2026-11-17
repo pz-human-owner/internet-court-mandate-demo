@@ -11,6 +11,7 @@ import {
   createStepGate, formatGen, evmReceiptCost, explorerTx, explorerAddress,
   liveFeesOrAbort, sendConfirmText, shouldUnlockAfterEstimate,
   viewContractAddress, parseVerdict, parseCase, RECORDED_RUN, recordedTxLinks, withTimeout,
+  resumeFromStatus, resumeStepParam, resumeFromStepParam, normalizeCaseStatus,
 } from './plan.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -103,6 +104,46 @@ function applyFees(est) {
   return state.fees;
 }
 
+function applyResume(action) {
+  for (const id of action.claim) {
+    if (!gate.isDone(id)) gate.claim(id);
+  }
+  if (action.enable) $(action.enable).disabled = false;
+  $('contract').innerHTML = `<a href="${explorerAddress(state.contract)}" target="_blank">${state.contract}</a> · <a href="https://studio.genlayer.com/?import-contract=${state.contract}" target="_blank">Studio import</a> (resume)`;
+  log(action.log);
+}
+
+async function unlockResume() {
+  state.contract = state.resumeContract;
+  let raw;
+  try {
+    raw = await withTimeout(
+      state.client.readContract({ address: state.contract, functionName: 'get_status', args: [] }),
+      VIEW_TIMEOUT_MS,
+      'get_status',
+    );
+  } catch (e) {
+    const why = (e && (e.shortMessage || e.message)) || String(e);
+    const step = resumeStepParam(typeof location !== 'undefined' ? location.search : '');
+    log(`Resume: could not read get_status (${why}). Falling back to URL step=${step} (add &step=submit to resume at submit_deliverable; default is request_verdict). This is not on-chain state.`);
+    applyResume(resumeFromStepParam(step));
+    state.estimated = true;
+    return;
+  }
+  const status = normalizeCaseStatus(raw);
+  log('Resume: read-only get_status', status);
+  let action;
+  try {
+    action = resumeFromStatus(status);
+  } catch (e) {
+    log((e && (e.shortMessage || e.message)) || String(e));
+    return; // estimated stays false so Estimate can be retried
+  }
+  applyResume(action);
+  state.estimated = true;
+  if (action.showVerdict) await readVerdict();
+}
+
 async function estimate() {
   // Reads the FeeManager on chain (eth_call only, no transaction).
   const est = await state.client.estimateTransactionFees({});
@@ -110,9 +151,12 @@ async function estimate() {
   log('Fee estimate per transaction (deposit sent as tx value; unused part is refunded at finalization)', { feeValue: formatGen(est.feeValue), policy: est.policy, distribution: est.distribution });
   // Re-clicks only refresh the displayed deposit; they must not open the next send step.
   if (!shouldUnlockAfterEstimate(state.estimated)) return;
+  if (state.resumeContract) {
+    await unlockResume();
+    return;
+  }
   state.estimated = true;
-  if (state.resumeContract) { gate.claim('deploy'); gate.claim('submit'); state.contract = state.resumeContract; $('verdict').disabled = false; log(`Resume mode: contract ${state.contract} already deployed and deliverable submitted; only request_verdict is enabled`); }
-  else $('deploy').disabled = false;
+  $('deploy').disabled = false;
 }
 
 async function afterSend(step, txId) {

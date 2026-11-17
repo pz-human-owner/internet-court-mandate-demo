@@ -64,7 +64,7 @@ git clone https://github.com/pz-human-owner/internet-court-mandate-demo && cd in
 
 `get_verdict` returns JSON: `status` (`open`, `submitted` or `resolved`), `verdict` (`TRUE`, `FALSE`, `UNDETERMINED`
 or empty), `reasoning`, `quote` (must appear in the fetched page), `source_url`, `last_error`, `attempts`. The contract
-also has `get_case` and `get_status`. The live page reads any case with `?contract=0x…`.
+also has `get_case` and `get_status`. The live page reads any case with `?contract=0x…`. After Estimate, that link also resumes the MetaMask send at the next unsent step from `get_status`.
 
 ### 2. Open your own case (real Bradbury transactions, your wallet)
 
