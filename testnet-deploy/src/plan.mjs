@@ -201,14 +201,14 @@ export function normalizeCaseStatus(raw) {
 
 /**
  * Optional ?step= hint used only when on-chain status cannot be read.
- * `submit` resumes at submit_deliverable; anything else (including absent or
- * malformed) defaults to `verdict` for backward compatibility with the
- * previous resume behavior, which always unlocked request_verdict.
+ * Fail-closed (#124 round 6936737208): only an explicit `step=submit` or
+ * `step=verdict` selects a step. Absent, empty or malformed values return
+ * null, and the page then enables nothing.
  */
 export function resumeStepParam(search = '') {
   let q = null;
   try { q = new URLSearchParams(search).get('step'); } catch { q = null; }
-  return q === 'submit' ? 'submit' : 'verdict';
+  return q === 'submit' || q === 'verdict' ? q : null;
 }
 
 /**
@@ -253,9 +253,33 @@ export function resumeFromStatus(status) {
   throw new Error(`Resume: unknown case status ${JSON.stringify(status)}; not enabling any send step`);
 }
 
-/** Map a ?step= fallback (when get_status cannot be read) onto resumeFromStatus. */
+/**
+ * Map an explicit ?step= fallback (when get_status cannot be read) onto resumeFromStatus.
+ * Throws for anything that is not an explicit `submit` or `verdict`, so no step is enabled.
+ */
 export function resumeFromStepParam(step) {
-  return resumeFromStatus(step === 'submit' ? CASE_STATUS_OPEN : CASE_STATUS_SUBMITTED);
+  if (step === 'submit') return resumeFromStatus(CASE_STATUS_OPEN);
+  if (step === 'verdict') return resumeFromStatus(CASE_STATUS_SUBMITTED);
+  throw new Error(`Resume: no explicit step ${JSON.stringify(step)}; not enabling any send step`);
+}
+
+/**
+ * What to do when the read-only get_status call fails. Fail-closed: without an explicit
+ * `&step=submit` or `&step=verdict` in the URL, nothing is enabled and nothing is claimed
+ * (`action: null`), so Estimate can be retried. With an explicit step, only that step is enabled.
+ */
+export function resumeOnReadFailure(search = '', why = 'unknown error') {
+  const step = resumeStepParam(search);
+  if (!step) {
+    return Object.freeze({
+      action: null,
+      log: `Resume: could not read get_status (${why}). No send step is enabled. Retry Estimate, or add &step=submit or &step=verdict to the URL to choose a step yourself (this is not on-chain state).`,
+    });
+  }
+  return Object.freeze({
+    action: resumeFromStepParam(step),
+    log: `Resume: could not read get_status (${why}). Using the explicit URL step=${step}; this is not on-chain state.`,
+  });
 }
 
 function parseJsonObject(raw, what) {

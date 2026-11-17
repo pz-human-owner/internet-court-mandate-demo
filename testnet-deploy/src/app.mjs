@@ -11,7 +11,7 @@ import {
   createStepGate, formatGen, evmReceiptCost, explorerTx, explorerAddress,
   liveFeesOrAbort, sendConfirmText, shouldUnlockAfterEstimate,
   viewContractAddress, parseVerdict, parseCase, RECORDED_RUN, recordedTxLinks, withTimeout,
-  resumeFromStatus, resumeStepParam, resumeFromStepParam, normalizeCaseStatus,
+  resumeFromStatus, resumeOnReadFailure, normalizeCaseStatus,
 } from './plan.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -124,9 +124,11 @@ async function unlockResume() {
     );
   } catch (e) {
     const why = (e && (e.shortMessage || e.message)) || String(e);
-    const step = resumeStepParam(typeof location !== 'undefined' ? location.search : '');
-    log(`Resume: could not read get_status (${why}). Falling back to URL step=${step} (add &step=submit to resume at submit_deliverable; default is request_verdict). This is not on-chain state.`);
-    applyResume(resumeFromStepParam(step));
+    // Fail-closed: without an explicit &step=, enable nothing (estimated stays false so Estimate can be retried).
+    const fb = resumeOnReadFailure(typeof location !== 'undefined' ? location.search : '', why);
+    log(fb.log);
+    if (!fb.action) return;
+    applyResume(fb.action);
     state.estimated = true;
     return;
   }

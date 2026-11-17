@@ -77,12 +77,16 @@ export async function journaledSend({ journal, step, from, nonce, doSend }) {
 /**
  * An incomplete record is single-use, by content and by run, not by path.
  * Identity: `contentSha256` = sha256 of the record's bytes; `runId` = sha256 of the journal's start entry
- * (accounts, start nonces, start time), which a copy, rename or edit of the record cannot change.
+ * (accounts, start nonces, start time). A copy or rename changes neither. Editing the record file changes
+ * `contentSha256` but not `runId`; editing the journal's start entry changes `runId`. A deliberate edit of both
+ * escapes this ledger, and then only the pinned-nonce guard below applies.
  * Consumption is recorded in a fixed per-machine ledger directory (default ~/.onchain-check/consumed-resumes,
  * override ONCHAIN_CHECK_LEDGER_DIR) as `run-<runId>.json` and `content-<sha>.json`, each created with O_EXCL,
  * before a resumed run can send. The path-local `<record>.consumed` marker is kept as a second, local check.
- * Boundary: the ledger is per machine; the pinned-nonce guard (resume refuses unless the chain's nonces match the
- * journal) still applies everywhere.
+ * Boundary: this is cooperative, local-scope protection, not tamper resistance. The ledger is per machine and per
+ * ledger directory: another machine, user/home, or ONCHAIN_CHECK_LEDGER_DIR pointed at an empty directory has no
+ * markers and bypasses it. The pinned-nonce guard (resume refuses unless the chain's nonces match the journal) still
+ * applies everywhere.
  */
 export const consumedPathFor = (recordPath) => `${recordPath}.consumed`;
 export const defaultLedgerDir = () => process.env.ONCHAIN_CHECK_LEDGER_DIR || join(homedir(), '.onchain-check', 'consumed-resumes');

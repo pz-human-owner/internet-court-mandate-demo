@@ -14,8 +14,8 @@
 //   - the case binding: the salt is derived from the GenLayer case (chain id +
 //     MandateVerdict address). It labels the delegation (it changes the hash), and
 //     settle() refuses a mismatched salt, but no caveat checks it.
-//   - the verdict gate: GenLayer Bradbury and the EVM testnet are separate chains with
-//     no oracle between them. The clerk reads the verdict (read-only gen_call) and
+//   - the verdict gate: GenLayer Bradbury and the EVM testnet are separate chains;
+//     nothing on the EVM side checks GenLayer. The clerk reads the verdict (read-only gen_call) and
 //     redeems only on a resolved TRUE.
 //
 // This is not an escrow. The fee stays in the principal's own smart account, and the

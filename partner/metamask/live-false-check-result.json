@@ -1,0 +1,159 @@
+{
+  "note": "Read-only check at a pinned Ethereum Sepolia block: for a live FALSE GenLayer verdict, the trusted off-chain carrier refuses to post TRUE, and the on-chain verdict gate refuses the payment without that post. Sepolia does not read GenLayer. No transaction was sent on any chain; the delegation below was signed off-chain with the throwaway owner key and never broadcast.",
+  "atUtc": "2026-11-17T03:48:23.569Z",
+  "sepoliaRpc": "https://ethereum-sepolia-rpc.publicnode.com",
+  "genlayerEndpoint": "https://rpc-bradbury.genlayer.com",
+  "case": {
+    "genlayerChainId": 4221,
+    "contract": "0x51a2343c90192360199553B92C0D9Fe976D77662",
+    "caseKey": "0xa5fcdde9e5ad31478f0fc9c5da18a8f2a537f44be751531608ad9ed4f1aa31cc",
+    "getVerdictRaw": "{\"status\": \"resolved\", \"verdict\": \"FALSE\", \"reasoning\": \"The deliverable claims the delegate holds the delegator's private key and that scope and caveats are only suggestions. The page says the delegator configures a scope and optional caveats that define the conditions under which the delegation can be redeemed, and caveat enforcers manage rules and restrictions, so the deliverable contradicts the page and violates the mandate.\", \"quote\": \"The delegator creates a delegation, configuring a scope and optional caveats that define the conditions under which the delegation can be redeemed.\", \"source_url\": \"https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/\", \"last_error\": \"\", \"attempts\": 1}",
+    "verdict": {
+      "status": "resolved",
+      "verdict": "FALSE",
+      "reasoning": "The deliverable claims the delegate holds the delegator's private key and that scope and caveats are only suggestions. The page says the delegator configures a scope and optional caveats that define the conditions under which the delegation can be redeemed, and caveat enforcers manage rules and restrictions, so the deliverable contradicts the page and violates the mandate."
+    },
+    "receiptChecked": true,
+    "requestVerdictReceipt": {
+      "id": "0x4b2b38cd79433d25fde027dcf6de853f0a6339d3d170b9131abe0a13565e7127",
+      "sender": "0x0f21f8a024dd2448a53e4763b23cc64ee939dfc4",
+      "recipient": "0x51a2343c90192360199553b92c0d9fe976d77662",
+      "statusName": "Finalized",
+      "txExecutionResultName": "FinishedWithReturn",
+      "numOfInitialValidators": 5,
+      "resultHash": "0x42f8998d69d0d598ae7f4fe0d6d965d34a92176649bd6a38227692a00febf30b",
+      "timestampsUnix": {
+        "created": 1794884176,
+        "committed": 1794884204,
+        "lastVote": 1794884209
+      },
+      "rounds": [
+        {
+          "round": 0,
+          "result": "MAJORITY_AGREE",
+          "leaderIndex": 0,
+          "votesCommitted": 5,
+          "votesRevealed": 5,
+          "validatorCount": 5,
+          "voteTally": {
+            "FINISHED_WITH_RETURN": 4,
+            "TIMEOUT": 1
+          },
+          "validatorsMatchingLeaderResult": 4,
+          "validators": [
+            {
+              "validator": "0xb04975f3c8cdcdb1273d1a6c2e2e93662f74554d",
+              "vote": "FINISHED_WITH_RETURN",
+              "matchesLeaderResult": true
+            },
+            {
+              "validator": "0x09c066924fbb6918154a853c2e9db316a3100939",
+              "vote": "FINISHED_WITH_RETURN",
+              "matchesLeaderResult": true
+            },
+            {
+              "validator": "0x0a6183b4b23d96cc3463c8d56bc3012b7b713f75",
+              "vote": "FINISHED_WITH_RETURN",
+              "matchesLeaderResult": true
+            },
+            {
+              "validator": "0x2ab2522db85ab48ed9f17007369a567df288a0c9",
+              "vote": "TIMEOUT",
+              "matchesLeaderResult": false
+            },
+            {
+              "validator": "0xf9e630b65b2cbcd9e84af177245eba4763b5e8d2",
+              "vote": "FINISHED_WITH_RETURN",
+              "matchesLeaderResult": true
+            }
+          ]
+        }
+      ],
+      "lastRound": {
+        "round": 0,
+        "result": "MAJORITY_AGREE",
+        "leaderIndex": 0,
+        "votesCommitted": 5,
+        "votesRevealed": 5,
+        "validatorCount": 5,
+        "voteTally": {
+          "FINISHED_WITH_RETURN": 4,
+          "TIMEOUT": 1
+        },
+        "validatorsMatchingLeaderResult": 4,
+        "validators": [
+          {
+            "validator": "0xb04975f3c8cdcdb1273d1a6c2e2e93662f74554d",
+            "vote": "FINISHED_WITH_RETURN",
+            "matchesLeaderResult": true
+          },
+          {
+            "validator": "0x09c066924fbb6918154a853c2e9db316a3100939",
+            "vote": "FINISHED_WITH_RETURN",
+            "matchesLeaderResult": true
+          },
+          {
+            "validator": "0x0a6183b4b23d96cc3463c8d56bc3012b7b713f75",
+            "vote": "FINISHED_WITH_RETURN",
+            "matchesLeaderResult": true
+          },
+          {
+            "validator": "0x2ab2522db85ab48ed9f17007369a567df288a0c9",
+            "vote": "TIMEOUT",
+            "matchesLeaderResult": false
+          },
+          {
+            "validator": "0xf9e630b65b2cbcd9e84af177245eba4763b5e8d2",
+            "vote": "FINISHED_WITH_RETURN",
+            "matchesLeaderResult": true
+          }
+        ]
+      }
+    }
+  },
+  "carrierDecision": {
+    "post": false,
+    "why": "verdict is FALSE; nothing is posted (deny is the default)"
+  },
+  "sepolia": {
+    "pinnedBlock": 12151838,
+    "enforcer": "0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a",
+    "carrier": "0x906b4D9d64a5d4Bb559292A3f24562835a122D10",
+    "agent": "0x8b5deeE4A52c321C81C33b2bC99834EB05B04929",
+    "principalSmartAccount": "0x2d006AF0f603CA2C2a6b8f9689A20E1dc65FC976",
+    "delegationManager": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+    "verdictTrueOnChain": false,
+    "delegation": {
+      "hash": "0x9507118fd3630fa06ac046e5153a6de3676ca69ec4274c8a5e12d36e618f7e36",
+      "signedOffChainOnly": true,
+      "gateCaveatIndex": 2,
+      "expiresAtUnix": 1794973692
+    },
+    "redemptionEthCall": {
+      "result": "reverted",
+      "reason": "VerdictGateEnforcer:verdict-not-true",
+      "data": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000245665726469637447617465456e666f726365723a766572646963742d6e6f742d7472756500000000000000000000000000000000000000000000000000000000"
+    },
+    "balanceOnlyEthCall": {
+      "method": "eth_call with one state override (a simulation, not a transaction)",
+      "block": 12151838,
+      "overrides": [
+        "principal balance = fee"
+      ],
+      "result": "reverted",
+      "reason": "VerdictGateEnforcer:verdict-not-true",
+      "data": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000245665726469637447617465456e666f726365723a766572646963742d6e6f742d7472756500000000000000000000000000000000000000000000000000000000"
+    },
+    "counterfactual": {
+      "method": "eth_call with state overrides (a simulation, not a transaction)",
+      "block": 12151838,
+      "overrides": [
+        "verdictTrue[carrier][caseKey] = TRUE",
+        "principal balance = fee"
+      ],
+      "result": "success",
+      "claim": "In these pinned simulations at Sepolia block 12151838, the redemption for this FALSE case reverted with VerdictGateEnforcer:verdict-not-true as is and with only the principal funded, and succeeded once verdictTrue was also overridden to TRUE, so in those simulations the gate is what refuses it. The carrier is a trusted off-chain writer; Sepolia does not read GenLayer."
+    }
+  },
+  "transactionsSent": 0
+}
