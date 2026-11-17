@@ -12,7 +12,7 @@ MetaMask's role here is limited: the jury reads MetaMask's official delegation d
 ### View mode details
 
 - Reads go to the GenLayer node RPC `https://rpc-bradbury.genlayer.com` (it sends `Access-Control-Allow-Origin: *`, so the hosted page can call it directly). Each read times out after 30 seconds.
-- `?contract=0x…` in the page URL reads a different MandateVerdict contract instead of the sample case. A malformed value is ignored. In the MetaMask section, after Estimate, that same link resumes at the next unsent step from a read-only `get_status` call: `open` enables only `submit_deliverable`, `submitted` enables only `request_verdict`, and `resolved` enables nothing and shows the verdict. If the read fails, add `&step=submit` to resume at `submit_deliverable` (the default is `request_verdict`).
+- `?contract=0x…` in the page URL reads a different MandateVerdict contract instead of the sample case. A malformed value is ignored. In the MetaMask section, after Estimate, that same link resumes at the next unsent step from a read-only `get_status` call: `open` enables only `submit_deliverable`, `submitted` enables only `request_verdict`, and `resolved` enables nothing and shows the verdict. If the read fails, nothing is enabled (fail-closed); retry Estimate, or add `&step=submit` or `&step=verdict` to choose a step yourself.
 - If the live read fails, the page says so in a yellow banner and shows the **recorded** result of the sample run (verdict, consensus, reasoning, quote) with explorer links and the dated receipts from [`../proof/`](../proof/), which the build copies into `dist/proof/`. That fallback is labelled as not live.
 - **Re-read live** repeats the three reads.
 

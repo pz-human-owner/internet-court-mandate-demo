@@ -7,7 +7,7 @@ import {
   DEFAULT_CONTRACT, VIEW_FUNCTIONS, isAddress, viewContractAddress, parseVerdict, parseCase,
   RECORDED_RUN, recordedTxLinks, withTimeout, explorerAddress,
   CASE_STATUS_OPEN, CASE_STATUS_SUBMITTED, CASE_STATUS_RESOLVED,
-  normalizeCaseStatus, resumeStepParam, resumeFromStatus, resumeFromStepParam,
+  normalizeCaseStatus, resumeStepParam, resumeFromStatus, resumeFromStepParam, resumeOnReadFailure,
 } from '../src/plan.mjs';
 
 const ME = '0x1111111111111111111111111111111111111111';
@@ -138,14 +138,14 @@ test('normalizeCaseStatus accepts get_status strings and get_verdict objects', (
   assert.equal(normalizeCaseStatus(undefined), '');
 });
 
-test('resumeStepParam: only step=submit is explicit; default is verdict', () => {
-  assert.equal(resumeStepParam(''), 'verdict');
-  assert.equal(resumeStepParam('?contract=' + ME), 'verdict');
+test('resumeStepParam: only explicit step=submit or step=verdict; absent or malformed is null', () => {
+  assert.equal(resumeStepParam(''), null);
+  assert.equal(resumeStepParam('?contract=' + ME), null);
   assert.equal(resumeStepParam('?contract=' + ME + '&step=verdict'), 'verdict');
   assert.equal(resumeStepParam('?step=submit&contract=' + ME), 'submit');
-  assert.equal(resumeStepParam('?step=SUBMIT'), 'verdict');
-  assert.equal(resumeStepParam('?step=open'), 'verdict');
-  assert.equal(resumeStepParam('?step='), 'verdict');
+  assert.equal(resumeStepParam('?step=SUBMIT'), null);
+  assert.equal(resumeStepParam('?step=open'), null);
+  assert.equal(resumeStepParam('?step='), null);
 });
 
 test('resumeFromStatus: open enables only submit; previous steps stay one-shot', () => {
@@ -199,9 +199,35 @@ test('resumeFromStatus rejects an unknown status so no send is unlocked', () => 
   assert.throws(() => resumeFromStatus(undefined), /unknown case status/);
 });
 
-test('resumeFromStepParam maps URL fallback onto the same open/submitted actions', () => {
+test('resumeFromStepParam maps an explicit step onto the open/submitted actions and refuses anything else', () => {
   assert.deepEqual(resumeFromStepParam('submit'), resumeFromStatus('open'));
   assert.deepEqual(resumeFromStepParam('verdict'), resumeFromStatus('submitted'));
-  assert.deepEqual(resumeFromStepParam('anything-else'), resumeFromStatus(CASE_STATUS_SUBMITTED));
+  assert.throws(() => resumeFromStepParam('anything-else'), /not enabling any send step/);
+  assert.throws(() => resumeFromStepParam(null), /not enabling any send step/);
+});
+
+test('get_status read failure without an explicit step enables nothing (fail-closed)', () => {
+  for (const search of ['', '?contract=' + ME, '?contract=' + ME + '&step=', '?contract=' + ME + '&step=SUBMIT', '?step=resolved']) {
+    const fb = resumeOnReadFailure(search, 'timeout');
+    assert.equal(fb.action, null, search);
+    assert.match(fb.log, /could not read get_status \(timeout\)\. No send step is enabled/);
+  }
+});
+
+test('get_status read failure with an explicit step enables only that step', () => {
+  const s = resumeOnReadFailure('?contract=' + ME + '&step=submit', 'rpc down');
+  assert.equal(s.action.enable, 'submit');
+  assert.deepEqual([...s.action.claim], ['deploy']);
+  assert.match(s.log, /explicit URL step=submit; this is not on-chain state/);
+  const v = resumeOnReadFailure('?contract=' + ME + '&step=verdict', 'rpc down');
+  assert.equal(v.action.enable, 'verdict');
+  assert.deepEqual([...v.action.claim], ['deploy', 'submit']);
+});
+
+test('resolved status enables nothing, even with an explicit step in the URL (read succeeded)', () => {
+  // A successful read always wins over the URL; the URL step is consulted only on read failure.
+  const action = resumeFromStatus('resolved');
+  assert.equal(action.enable, null);
+  assert.deepEqual([...action.claim], ['deploy', 'submit', 'verdict']);
 });
 

@@ -6,9 +6,9 @@
 //   - the verdict gate: VerdictGateEnforcer.beforeHook reverts "VerdictGateEnforcer:verdict-not-true"
 //     unless verdictTrue[carrier][caseKey] is set;
 //   - the case binding: caseKey (= the case salt) and the carrier are the caveat's signed terms.
-// What does NOT: whether the GenLayer verdict really is TRUE. Ethereum cannot read GenLayer, so the
-// carrier named in the signed delegation is trusted to post only a finalized TRUE. It is a trusted
-// relayer, not an oracle, and this is not trustless.
+// What does NOT: whether the GenLayer verdict really is TRUE. No contract on Ethereum checks GenLayer, so
+// the carrier named in the signed delegation is trusted to post only a finalized TRUE. It is a trusted
+// off-chain writer.
 // A posted TRUE is never cleared; after it the principal's only remedies are disableDelegation or the
 // delegation's expiry. One post opens EVERY delegation whose gate terms name that carrier and caseKey:
 // LimitedCalls(1) is per delegation hash, not per case.

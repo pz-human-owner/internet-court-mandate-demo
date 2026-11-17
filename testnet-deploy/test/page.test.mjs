@@ -103,15 +103,36 @@ test('panel has On-chain verdict check rows: five Sepolia transactions, the enfo
   assert.ok(footer.includes('#onchain-rows'));
 });
 
-test('on-chain check wording names who is still trusted and never claims trustless', () => {
-  assert.match(panel, /<b>Not trustless\.<\/b>/);
+test('on-chain check wording names who is still trusted and avoids trustless/oracle wording', () => {
+  assert.match(panel, /<b>The carrier is a trusted off-chain writer\.<\/b>/);
   // A post is final, the principal's remedies are named, and one post opens every matching delegation.
   assert.match(panel, /A posted TRUE cannot be undone/);
   assert.match(panel, /<code>disableDelegation<\/code>\) or let it expire/);
   assert.match(panel, /One post opens every delegation that names that carrier and that case; the once-only limit is per delegation, not per case\./);
-  assert.match(panel, /trusted relayer, not an oracle/);
   assert.match(panel, /carrier is trusted in T1–T5/);
-  assert.match(panel, /cannot read GenLayer/);
-  assert.doesNotMatch(panel.replace(/Not trustless/g, ''), /trustless|trust-minimi[sz]ed|oracle-free|decentrali[sz]ed oracle/i);
-  assert.doesNotMatch(panel.replace(/not an oracle|no oracle between them/g, ''), /\boracle\b/i);
+  assert.match(panel, /No contract on Ethereum Sepolia checks GenLayer itself/);
+  assert.doesNotMatch(panel, /trustless|trust-minimi[sz]ed|\boracle\b|reads? GenLayer/i);
+});
+
+test('panel has the live FALSE verdict rows: three GenLayer transactions, read-only refusal, committed record', () => {
+  const s = panel.indexOf('id="false-rows"');
+  assert.ok(s > panel.indexOf('id="onchain-rows"'));
+  const rows = panel.slice(s, panel.indexOf('</tbody>', s));
+  for (const id of [
+    '0x6829b7152b048029102448a6efec269738650e6991ede3b8697396dac2579260',
+    '0x1bff12f7ef76bf094dc533ed0f4570fff6b6eab52c3e523d32f42a670b6931d7',
+    '0x4b2b38cd79433d25fde027dcf6de853f0a6339d3d170b9131abe0a13565e7127',
+  ]) assert.ok(rows.includes(`https://explorer-bradbury.genlayer.com/tx/${id}`), id);
+  for (const h of [
+    '0x5ad88e8af64f0b2316c69e58cdf599f75429b72f65e1120528384a17154285f2',
+    '0x1deacb11dcae3909a958a20da950618c132d637693381e88bd41306e39b9237f',
+    '0x02dc4fb3898e1db9eb2a3636fb1051a95216e86e25a39674e1e9821c3a5d1900',
+  ]) assert.ok(rows.includes(`https://scan.testnet-chain.genlayer.com/tx/${h}`), h);
+  assert.match(rows, /Verdict FALSE/);
+  assert.match(rows, /4 of 5 validators matched the leader's result, 1 timed out/);
+  assert.match(rows, /VerdictGateEnforcer:verdict-not-true/);
+  assert.doesNotMatch(rows, /sepolia\.etherscan\.io\/tx/); // no Sepolia transaction for the FALSE case
+  assert.match(panel, /partner\/metamask\/live-false-check-result\.json/);
+  const footer = html.slice(html.indexOf('<pre id="log">'));
+  assert.ok(footer.includes('#false-rows'));
 });

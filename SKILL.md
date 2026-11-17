@@ -38,6 +38,7 @@ https://pz-human-owner.github.io/internet-court-mandate-demo/
 | `VerdictGateEnforcer` (on-chain verdict gate caveat; source verified on [Sourcify](https://repo.sourcify.dev/11155111/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a)) | Sepolia | [`0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a`](https://sepolia.etherscan.io/address/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a) |
 | On-chain check run: blocked before the verdict was posted, paid after | Sepolia | [`partner/metamask/live-onchain-check-result.json`](partner/metamask/live-onchain-check-result.json) |
 | Raw Bradbury receipts for the case | Bradbury | [`proof/`](proof/) |
+| Live FALSE case (`request_verdict` [`0x4b2b38cd…`](https://explorer-bradbury.genlayer.com/tx/0x4b2b38cd79433d25fde027dcf6de853f0a6339d3d170b9131abe0a13565e7127)) and its read-only Sepolia refusal check | Bradbury + Sepolia | [`0x51a2343c90192360199553B92C0D9Fe976D77662`](https://scan.testnet-chain.genlayer.com/address/0x51a2343c90192360199553B92C0D9Fe976D77662), [`partner/metamask/live-false-check-result.json`](partner/metamask/live-false-check-result.json) |
 
 ## Setup
 
@@ -174,8 +175,8 @@ exits non-zero and writes nothing. It never overwrites an existing result file.
 MetaMask's Delegation Framework. A delegation that carries it can be redeemed only after the **carrier named in its
 signed terms** has called `postVerdictTrue(4221, caseContract)` on the enforcer. Its terms are
 `abi.encode(caseKey, carrier)`, and `caseKey` is the same value as the salt. The verdict gate and the case match
-become chain rules, so the agent can be the delegate and redeem for itself. **It is not trustless:** Sepolia cannot
-read GenLayer, so the carrier is a trusted relayer, not an oracle, trusted to post only a finalized `TRUE`. It
+become chain rules, so the agent can be the delegate and redeem for itself. **The carrier is still trusted:** it is a
+trusted off-chain writer (no contract on Sepolia checks GenLayer itself), trusted to post only a finalized `TRUE`. It
 cannot post FALSE, change the amount, the recipient or any other limit, or post for another carrier.
 A posted TRUE cannot be undone: after it, the principal's only remedies are `disableDelegation` or letting the
 delegation expire. One post opens every delegation that names that carrier and that case; the once-only limit
@@ -227,7 +228,9 @@ check fails after a broadcast, the runner writes `<out>.incomplete.json` and exi
 exactly T1 and T2 were sent and nothing is pending; T2 comes from the journal. Anything else is refused. An
 incomplete record is single-use by content and run (a ledger in `~/.onchain-check/consumed-resumes`), so a second
 resume, from a copy, a renamed file or after deleting a marker, is refused. Do not copy, rename or edit an incomplete
-record, or delete its markers, to resume it again.
+record, or delete its markers, to resume it again. This is local-scope protection only: the ledger is per machine, and
+another machine or `ONCHAIN_CHECK_LEDGER_DIR` pointed at an empty directory bypasses it; the pinned-nonce check still
+applies everywhere.
 The agent pays the gas for its two redemptions, so the agent address needs a little Sepolia ETH.
 
 ## Verify
@@ -242,6 +245,14 @@ The agent pays the gas for its two redemptions, so the agent address needs a lit
   committed artifact, all five receipts, a parent-block replay of the blocked redemption, `verdictTrue`, and the
   Sourcify exact match. Like `refusal.mjs verify`, the replay needs an archive-capable `SEPOLIA_RPC_URL` once the
   blocks age out of the public RPC's recent-state window. Its 17 November 2026 (UTC) result is in `live-onchain-check-verify.json`.
+- FALSE case: `(cd partner/metamask && OWNER_KEY=<throwaway owner key> node scripts/false-check.mjs check --case
+  0x51a2343c90192360199553B92C0D9Fe976D77662 --request-txid
+  0x4b2b38cd79433d25fde027dcf6de853f0a6339d3d170b9131abe0a13565e7127 --out <new.json>)` sends nothing. It records the
+  `request_verdict` receipt (Finalized, MAJORITY_AGREE, each validator's vote), requires the carrier rule to refuse and
+  `verdictTrue` to be false, and requires the agent's redemption `eth_call` to revert `verdict-not-true` as is and with
+  only the principal funded, and to succeed only with `verdictTrue` also overridden. `--request-txid` is required unless
+  you pass `--no-receipt`, which marks the output "receipt not checked". Recorded output:
+  `partner/metamask/live-false-check-result.json`.
 - `LimitedCallsEnforcer.callCounts(DelegationManager, delegationHash)` reads how often a delegation was redeemed.
 - `npm test` in `partner/metamask` re-checks both recorded runs against the code (hashes, salts, decoded revert data).
 - `(cd partner/metamask && SEPOLIA_RPC_URL=<an archive-capable Sepolia RPC> node scripts/refusal.mjs verify)` re-reads
@@ -251,12 +262,12 @@ The agent pays the gas for its two redemptions, so the agent address needs a lit
 
 ## Trust model and limits
 
-- **The clerk is trusted for the verdict (steps 3–5).** GenLayer and Sepolia have no oracle between them. The verdict check and the
+- **The clerk is trusted for the verdict (steps 3–5).** Nothing on Sepolia checks GenLayer. The verdict check and the
   case match run in the clerk's code; a dishonest clerk could redeem on `FALSE`. It still could not pay anyone else, pay
   more, pay twice, or pay after expiry.
 - **The carrier is trusted for the verdict (step 6).** With `VerdictGateEnforcer` the gate and the case match are checked
   on-chain, but whether the GenLayer verdict really is `TRUE` rests on the carrier named in the signed delegation. It is a
-  trusted relayer, not an oracle, and this is not trustless. A posted TRUE cannot be undone (the principal can only
+  trusted off-chain writer. A posted TRUE cannot be undone (the principal can only
   `disableDelegation` or let it expire), and one post opens every delegation naming that carrier and case. In the
   recorded run the carrier was the clerk's throwaway key, and one operator held every key.
 - **Not an escrow.** The fee stays in the principal's smart account until redemption; the owner can move it out first.
