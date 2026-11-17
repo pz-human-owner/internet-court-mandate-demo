@@ -31,7 +31,52 @@ test('panel carries the honesty notes from the README', () => {
   assert.match(panel, /clerk is trusted/i);
   assert.match(panel, /isn't an escrow/i);
   assert.match(panel, /same operator held/i);
-  assert.match(panel, /FALSE path[^<]*<\/b>|FALSE path/);
-  assert.match(panel, /Simulated only/i);
+  assert.match(panel, /FALSE or UNDETERMINED verdict/);
+  assert.match(panel, /simulated only/i);
   assert.doesNotMatch(panel.replace(/isn't an escrow/gi, ''), /escrow/i);
+});
+
+test('panel has Refusal on Sepolia rows with the two reverted transactions and the refusal record', () => {
+  const start = panel.indexOf('id="refusal-rows"');
+  assert.ok(start > 0);
+  const rows = panel.slice(start, panel.indexOf('</tbody>', start));
+  assert.match(rows, /Refusal on Sepolia/);
+  for (const h of [
+    '0x323887a077ab6f8be8226ab47f259f7a1b6562df2627db31f8ee5e592c33528b',
+    '0x28c9837c4137efd47ef85cac8940499cb792dfbc53b8860d9a41b3f92755d640',
+  ]) assert.ok(rows.includes(`https://sepolia.etherscan.io/tx/${h}`), h);
+  assert.equal((rows.match(/Reverted on-chain/g) ?? []).length, 2);
+  assert.match(rows, /InvalidDelegate/);
+  assert.match(rows, /allowance-exceeded/);
+  assert.match(rows, /no transaction/);
+  assert.match(panel, /partner\/metamask\/live-refusal-result\.json/);
+});
+
+test('honesty notes match the refusal run: live now vs still simulated', () => {
+  assert.match(panel, /Now live on Sepolia, not just simulated/);
+  assert.match(panel, /Still simulated only:<\/b> a live FALSE or UNDETERMINED verdict/);
+  assert.match(panel, /redemption after expiry/);
+  assert.doesNotMatch(panel, /Simulated only:<\/b> the FALSE path and the on-chain rejections/);
+});
+
+test('SKILL.md is linked from the hero and the footer', () => {
+  const skill = 'https://github.com/pz-human-owner/internet-court-mandate-demo/blob/main/SKILL.md';
+  const hero = html.slice(html.indexOf('<h1>'), html.indexOf('<h2>'));
+  assert.ok(hero.includes(skill));
+  const footer = html.slice(html.indexOf('<pre id="log">'));
+  assert.ok(footer.includes(skill));
+  assert.ok(footer.includes('#refusal-rows'));
+});
+
+test('page is not tied to unrelated products', () => {
+  assert.doesNotMatch(html, /lens ?closer|lens labs/i);
+});
+
+test('refusal badge and notes do not call the clerk\'s repeat redemption unauthorized', () => {
+  assert.doesNotMatch(html, /unauthori[sz]ed/i);
+  assert.match(panel, /an outsider's redemption and a repeat redemption both reverted/);
+  assert.match(panel, /held 0 ETH at the time, so R1 shows that caller check, not a funded payment being blocked/);
+  assert.match(panel, /<code>exactCalldata<\/code>/);
+  assert.match(panel, /requires empty calldata; no function call/);
+  assert.doesNotMatch(panel, /cannot call a contract/);
 });

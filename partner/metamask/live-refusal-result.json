@@ -1,0 +1,211 @@
+{
+  "note": "Live refusal run on Ethereum Sepolia (chain 11155111). Throwaway testnet keys; no private keys in this file. R1 and R2 are deliberately reverting transactions sent with a fixed gas limit so they are mined.",
+  "chainId": 11155111,
+  "delegationManager": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+  "accounts": {
+    "owner": "0xF7EA5cC74Cd44c5EA35c0285bC44eB76A7c20bF4",
+    "clerk": "0x906b4D9d64a5d4Bb559292A3f24562835a122D10",
+    "principalSmartAccount": "0x2d006AF0f603CA2C2a6b8f9689A20E1dc65FC976",
+    "agent": "0x8b5deeE4A52c321C81C33b2bC99834EB05B04929"
+  },
+  "startedAtUtc": "2026-11-16T22:52:34.189Z",
+  "balancesBefore": {
+    "clerkEth": "1.62899999997189634",
+    "agentEth": "0.001",
+    "principalSmartAccountEth": "0"
+  },
+  "sampleCaseVerdict": {
+    "network": "GenLayer Testnet Bradbury",
+    "chainId": 4221,
+    "endpoint": "https://rpc-bradbury.genlayer.com",
+    "contract": "0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B",
+    "readAtUtc": "2026-11-16T22:52:40.210Z",
+    "response": "{\"status\": \"resolved\", \"verdict\": \"TRUE\", \"reasoning\": \"The deliverable accurately reflects the page: it mentions ERC-7710, states that the delegator configures a scope and optional caveats, and does not claim the delegate receives the private key. All mandate clauses are satisfied.\", \"quote\": \"The delegator creates a delegation, configuring a scope and optional caveats that define the conditions under which the delegation can be redeemed.\", \"source_url\": \"https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/\", \"last_error\": \"\", \"attempts\": 1}"
+  },
+  "freshDelegation": {
+    "hash": "0xa27cd9c3ddba06f681e5f508c789b298a4c20fed6844fb56963c40b8e5e8340f",
+    "boundCase": "0xb773df7716aD5E5382D179a704B330EdEdB0c635",
+    "salt": "0x4e920bb815aeb56c28671c1a3707faff79263bf7a93e24d221de2f49be5f033f",
+    "expectedSaltForSampleCase": "0x4ecd88166fcf7b929f66342a4ee81440ff553e1f8b76c8bcf763ace4107de8c1",
+    "delegator": "0x2d006AF0f603CA2C2a6b8f9689A20E1dc65FC976",
+    "delegate": "0x906b4D9d64a5d4Bb559292A3f24562835a122D10",
+    "feeWei": "1000000000000000",
+    "expiresAtUnix": 1794873160,
+    "expiresAtUtc": "2026-11-16T23:52:40.000Z",
+    "signed": {
+      "delegate": "0x906b4D9d64a5d4Bb559292A3f24562835a122D10",
+      "delegator": "0x2d006AF0f603CA2C2a6b8f9689A20E1dc65FC976",
+      "authority": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "caveats": [
+        {
+          "enforcer": "0x99F2e9bF15ce5eC84685604836F71aB835DBBdED",
+          "terms": "0x",
+          "args": "0x00"
+        },
+        {
+          "enforcer": "0xF71af580b9c3078fbc2BBF16FbB8EEd82b330320",
+          "terms": "0x00000000000000000000000000000000000000000000000000038d7ea4c68000",
+          "args": "0x00"
+        },
+        {
+          "enforcer": "0x146713078D39eCC1F5338309c28405ccf85Abfbb",
+          "terms": "0x8b5deeE4A52c321C81C33b2bC99834EB05B0492900000000000000000000000000000000000000000000000000038d7ea4c68000",
+          "args": "0x00"
+        },
+        {
+          "enforcer": "0xE144b0b2618071B4E56f746313528a669c7E65c5",
+          "terms": "0x906b4D9d64a5d4Bb559292A3f24562835a122D10",
+          "args": "0x00"
+        },
+        {
+          "enforcer": "0x04658B29F6b82ed55274221a06Fc97D318E25416",
+          "terms": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "args": "0x00"
+        },
+        {
+          "enforcer": "0x1046bb45C8d673d4ea75321280DB34899413c069",
+          "terms": "0x000000000000000000000000000000000000000000000000000000006afb9748",
+          "args": "0x00"
+        }
+      ],
+      "salt": "0x4e920bb815aeb56c28671c1a3707faff79263bf7a93e24d221de2f49be5f033f",
+      "signature": "0x01d602a40ddc1eeac8e30f8ef671ae3c03d7104ae0617236f9dc088fbf7f4f236d779cba26e6bf9d8a2deaf3708756709e9a1e19c0fa9b35655996fa13d093cd1c"
+    }
+  },
+  "clerkRefusals": [
+    {
+      "step": "settle(fresh delegation, case = sample case with verdict TRUE)",
+      "transactionsSent": 0,
+      "action": "REFUSE",
+      "why": "delegation salt does not match this GenLayer case"
+    },
+    {
+      "step": "settle(fresh delegation, case = its own case, no MandateVerdict deployed)",
+      "transactionsSent": 0,
+      "action": "NO_TX",
+      "why": "get_verdict failed: An unknown RPC error occurred.",
+      "note": "During the run this read hit a network error, so the clerk stopped with no transaction. A separate read-only gen_call at 2026-11-16T22:53:27.985Z returned: \"Requested resource not found.\" (GenLayer RPC: contract not found at address 0xb773df7716aD5E5382D179a704B330EdEdB0c635).",
+      "recheck": {
+        "atUtc": "2026-11-16T22:53:27.985Z",
+        "endpoint": "https://rpc-bradbury.genlayer.com",
+        "result": "Requested resource not found."
+      }
+    }
+  ],
+  "transactions": {
+    "R1_outsiderRedeem": {
+      "label": "R1 agent redeems the fresh delegation itself (skips the clerk)",
+      "hash": "0x323887a077ab6f8be8226ab47f259f7a1b6562df2627db31f8ee5e592c33528b",
+      "etherscan": "https://sepolia.etherscan.io/tx/0x323887a077ab6f8be8226ab47f259f7a1b6562df2627db31f8ee5e592c33528b",
+      "status": "reverted",
+      "block": 12150397,
+      "timestampUtc": "2026-11-16T22:52:48.000Z",
+      "from": "0x8b5deeE4A52c321C81C33b2bC99834EB05B04929",
+      "to": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+      "gasLimit": 400000,
+      "gasUsed": 168856,
+      "delegationHash": "0xa27cd9c3ddba06f681e5f508c789b298a4c20fed6844fb56963c40b8e5e8340f",
+      "blockedBy": "DelegationManager (InvalidDelegate: caller is not the delegate)",
+      "blockedByAddress": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+      "simulatedRevertReason": "InvalidDelegate",
+      "simulatedRevertData": "0xb5863604",
+      "limitedCallsCountBefore": 0,
+      "limitedCallsCountAfter": 0,
+      "replayAtParentBlock": {
+        "block": 12150396,
+        "method": "eth_call with the mined tx from/to/input/gas",
+        "revertData": "0xb5863604",
+        "decoded": "InvalidDelegate"
+      }
+    },
+    "R2_secondRedeem": {
+      "label": "R2 clerk redeems the already-paid live-run delegation a second time",
+      "hash": "0x28c9837c4137efd47ef85cac8940499cb792dfbc53b8860d9a41b3f92755d640",
+      "etherscan": "https://sepolia.etherscan.io/tx/0x28c9837c4137efd47ef85cac8940499cb792dfbc53b8860d9a41b3f92755d640",
+      "status": "reverted",
+      "block": 12150399,
+      "timestampUtc": "2026-11-16T22:53:12.000Z",
+      "from": "0x906b4D9d64a5d4Bb559292A3f24562835a122D10",
+      "to": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+      "gasLimit": 400000,
+      "gasUsed": 168856,
+      "delegationHash": "0xd76ec7fbd8dd4352cd2aaf9b99cb15e515536bee9363e3d760992793ff778187",
+      "blockedBy": "NativeTokenTransferAmountEnforcer (allowance-exceeded)",
+      "blockedByAddress": "0xF71af580b9c3078fbc2BBF16FbB8EEd82b330320",
+      "simulatedRevertReason": "NativeTokenTransferAmountEnforcer:allowance-exceeded",
+      "simulatedRevertData": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000344e6174697665546f6b656e5472616e73666572416d6f756e74456e666f726365723a616c6c6f77616e63652d6578636565646564000000000000000000000000",
+      "limitedCallsCountBefore": 1,
+      "limitedCallsCountAfter": 1,
+      "replayAtParentBlock": {
+        "block": 12150398,
+        "method": "eth_call with the mined tx from/to/input/gas",
+        "decoded": "NativeTokenTransferAmountEnforcer:allowance-exceeded"
+      }
+    }
+  },
+  "balancesAfter": {
+    "clerkEth": "1.6289999999693635",
+    "agentEth": "0.00099999999746716",
+    "principalSmartAccountEth": "0"
+  },
+  "checks": {
+    "bothReverted": true,
+    "agentNetChangeWei": "-2532840",
+    "agentPaidOnlyGasForR1": true,
+    "spentDelegationCallCount": 1,
+    "freshDelegationCallCount": 0
+  },
+  "finishedAtUtc": "2026-11-16T22:53:15.946Z",
+  "gasNote": "Both reverts report the same gasUsed (168856); a read-only re-check of both receipts (independentReverification) confirms it, and each sender's balance fell by exactly 168856 x 15 wei = 2532840 wei. Equal gasUsed observed; cause not traced (the public RPCs used offer no debug_traceTransaction).",
+  "whatThisShows": [
+    "Clerk code: a delegation bound to a different GenLayer case is refused even while the sample case's live verdict is TRUE (no transaction).",
+    "Clerk code: with no readable verdict for the delegation's own case, nothing is sent.",
+    "On-chain R1: the agent cannot redeem a delegation by itself; MetaMask's DelegationManager reverts with InvalidDelegate (only the named delegate, the clerk, may redeem). The principal smart account held 0 ETH before and after R1, so R1 shows the delegate (caller) check, not a funded payment being blocked.",
+    "On-chain R2: the clerk (the authorized delegate) cannot redeem the delegation already paid in the live run a second time; NativeTokenTransferAmountEnforcer reverts with allowance-exceeded (its LimitedCalls count is already 1, which would also block it; that second block was not observed on-chain)."
+  ],
+  "whatThisDoesNotShow": [
+    "A live FALSE or UNDETERMINED GenLayer verdict. The only deployed case resolved TRUE, and no new GenLayer transactions were made; the FALSE and UNDETERMINED paths are covered by offline unit tests and the local fork simulation.",
+    "That the verdict is enforced on-chain. The verdict and case checks are still in the clerk's code; a dishonest clerk could redeem a delegation addressed to it, within the caveats."
+  ],
+  "independentReverification": {
+    "method": "node scripts/refusal.mjs verify (read-only: eth_getTransactionReceipt, eth_getTransactionByHash, eth_call replay at the parent block; no transactions)",
+    "rpc": "https://sepolia.gateway.tenderly.co",
+    "atUtc": "2026-11-16T23:22:25.833Z",
+    "passed": true,
+    "transactions": {
+      "R1": {
+        "hash": "0x323887a077ab6f8be8226ab47f259f7a1b6562df2627db31f8ee5e592c33528b",
+        "from": "0x8b5deee4a52c321c81c33b2bc99834eb05b04929",
+        "receiptStatus": "reverted",
+        "block": 12150397,
+        "gasUsed": 168856,
+        "effectiveGasPriceWei": "15",
+        "feePaidWei": "2532840",
+        "valueWei": "0",
+        "replayBlock": 12150396,
+        "replayRevertData": "0xb5863604",
+        "replayDecoded": "InvalidDelegate",
+        "expected": [
+          "InvalidDelegate"
+        ]
+      },
+      "R2": {
+        "hash": "0x28c9837c4137efd47ef85cac8940499cb792dfbc53b8860d9a41b3f92755d640",
+        "from": "0x906b4d9d64a5d4bb559292a3f24562835a122d10",
+        "receiptStatus": "reverted",
+        "block": 12150399,
+        "gasUsed": 168856,
+        "effectiveGasPriceWei": "15",
+        "feePaidWei": "2532840",
+        "valueWei": "0",
+        "replayBlock": 12150398,
+        "replayRevertData": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000344e6174697665546f6b656e5472616e73666572416d6f756e74456e666f726365723a616c6c6f77616e63652d6578636565646564000000000000000000000000",
+        "replayDecoded": "NativeTokenTransferAmountEnforcer:allowance-exceeded",
+        "expected": [
+          "NativeTokenTransferAmountEnforcer:allowance-exceeded",
+          "LimitedCallsEnforcer:limit-exceeded"
+        ]
+      }
+    }
+  }
+}

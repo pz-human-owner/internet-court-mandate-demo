@@ -11,6 +11,7 @@
     "plan": "node scripts/live.mjs plan"
   },
   "dependencies": {
+    "@metamask/delegation-abis": "2.0.0",
     "@metamask/smart-accounts-kit": "2.0.0",
     "genlayer-js": "2.0.0-rc.3",
     "viem": "2.57.20"

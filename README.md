@@ -1,13 +1,14 @@
 # Internet Court Mandate Demo
 
 **Live demo (no wallet needed):** https://pz-human-owner.github.io/internet-court-mandate-demo/  
-**Demo video (44 s):** [mission101_demo_v4s.mp4](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/download/v1.2-demo/mission101_demo_v4s.mp4) on the [v1.2-demo release](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/tag/v1.2-demo)
+**Demo video (44 s):** [mission101_demo_v4s.mp4](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/download/v1.2-demo/mission101_demo_v4s.mp4) on the [v1.2-demo release](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/tag/v1.2-demo)  
+**Reuse it:** [`SKILL.md`](SKILL.md), an agent skill that walks through reading a verdict, opening a case, and building, settling and refusing the MetaMask delegation
 
 A principal writes a mandate, binds the evidence a jury may read, and appoints an agent. The agent submits a deliverable. A [GenLayer](https://docs.genlayer.com/) Intelligent Contract then acts as an [Internet Court](https://internetcourt.org/)-style jury: validators fetch a page at the submitted source URL and record whether the deliverable met the mandate.
 
 The sample case binds official [MetaMask Smart Accounts Kit: Delegation](https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/) documentation (HTTP 200, no redirect, checked 15 November 2026). The mandate asks for a short briefing that mentions ERC-7710, explains that the delegator configures a scope and optional caveats, and never claims that the delegate holds the delegator's private key.
 
-**How MetaMask fits in, plainly:** two ways. (1) The jury reads MetaMask's official delegation documentation as its evidence, and MetaMask is the optional browser signer if you deploy your own copy of the contract. (2) [`partner/metamask/`](partner/metamask/) settles the case with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/): the principal's MetaMask smart account signs an ERC-7710 delegation that can pay the agent a fixed fee once, and a settlement script redeems it only after the GenLayer contract returns TRUE. The delegation's limits are enforced on-chain by MetaMask's Delegation Framework; the verdict check and the case match are done by that script, not by a contract, and the fee is not locked in escrow (see [MetaMask delegation settlement](#metamask-delegation-settlement)). That flow has run live on Ethereum Sepolia against the real Bradbury verdict: the [redeem transaction](https://sepolia.etherscan.io/tx/0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f) paid the agent 0.001 ETH. MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project is not endorsed by MetaMask.
+**How MetaMask fits in, plainly:** two ways. (1) The jury reads MetaMask's official delegation documentation as its evidence, and MetaMask is the optional browser signer if you deploy your own copy of the contract. (2) [`partner/metamask/`](partner/metamask/) settles the case with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/): the principal's MetaMask smart account signs an ERC-7710 delegation that can pay the agent a fixed fee once, and a settlement script redeems it only after the GenLayer contract returns TRUE. The delegation's limits are enforced on-chain by MetaMask's Delegation Framework; the verdict check and the case match are done by that script, not by a contract, and the fee is not locked in escrow (see [MetaMask delegation settlement](#metamask-delegation-settlement)). That flow has run live on Ethereum Sepolia against the real Bradbury verdict: the [redeem transaction](https://sepolia.etherscan.io/tx/0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f) paid the agent 0.001 ETH. A second live run showed the refusals: an outsider's redemption and a second redemption both [reverted on Sepolia](#refusal-on-sepolia). MetaMask is listed in the Founding Partners section of [internetcourt.org](https://internetcourt.org/). This project is not endorsed by MetaMask.
 
 ## Live demo
 
@@ -92,13 +93,13 @@ The chain doesn't guarantee that the fee is still there; see step 1. A dishonest
 - signs the delegation
 - reads the **real** verdict from Bradbury (TRUE) and redeems, so the agent receives exactly 0.001 ETH
 - checks that a mocked FALSE verdict is refused without sending anything
-- checks that an outsider's redemption, a second redemption, and a redemption after expiry all revert on-chain
+- checks that an outsider's redemption, a second redemption, and a redemption after expiry all revert on-chain (the first two have since also reverted on public Sepolia; see [Refusal on Sepolia](#refusal-on-sepolia))
 
 The recorded output is in [`partner/metamask/sim-result.json`](partner/metamask/sim-result.json).
 
 ### Live run on Sepolia
 
-On 16 November 2026 (20:38–20:39 UTC) the flow ran on public Ethereum Sepolia with throwaway testnet keys. The clerk read the real Bradbury verdict for [`0x07E2…2F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B), got `resolved` / **TRUE**, and redeemed the delegation. All keys were throwaway testnet keys, and the same operator held both the OWNER and CLERK keys (the agent is only a receiving address). To keep the demo to one funded account, the clerk paid the gas for all three transactions and also sent the 0.001 ETH fee into the principal's smart account (step B). In real use the principal would fund their own account. The full record, with hashes, blocks, addresses, the delegation hash, caveat enforcers and a raw `get_verdict` response (from a read-only call made after the run), is in [`partner/metamask/live-result.json`](partner/metamask/live-result.json).
+On 16 November 2026 (20:38–20:39 UTC) the flow ran on public Ethereum Sepolia with throwaway testnet keys. The clerk read the real Bradbury verdict for [`0x07E2…2F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B), got `resolved` / **TRUE**, and redeemed the delegation. All keys were throwaway testnet keys, and the same operator held both the OWNER and CLERK keys (in this run the agent was only a receiving address; the refusal run below also used its throwaway key). To keep the demo to one funded account, the clerk paid the gas for all three transactions and also sent the 0.001 ETH fee into the principal's smart account (step B). In real use the principal would fund their own account. The full record, with hashes, blocks, addresses, the delegation hash, caveat enforcers and a raw `get_verdict` response (from a read-only call made after the run), is in [`partner/metamask/live-result.json`](partner/metamask/live-result.json).
 
 | Step | Transaction | Block | Result |
 |---|---|---|---|
@@ -107,7 +108,19 @@ On 16 November 2026 (20:38–20:39 UTC) the flow ran on public Ethereum Sepolia 
 | – Owner signs the ERC-7710 delegation off-chain (hash `0xd76ec7fb…8187`) | no transaction | – | – |
 | C. The clerk [`0x906b…2D10`](https://sepolia.etherscan.io/address/0x906b4D9d64a5d4Bb559292A3f24562835a122D10) reads verdict TRUE and calls `DelegationManager.redeemDelegations` | [`0x64a3f537…`](https://sepolia.etherscan.io/tx/0x64a3f537451b275f12421f52fea886eb89dd666fbf9f9ee697a64d1f423b2e1f) | 12149741 | success; agent [`0x8b5d…4929`](https://sepolia.etherscan.io/address/0x8b5deeE4A52c321C81C33b2bC99834EB05B04929) went from 0 to 0.001 ETH |
 
-The FALSE path and the on-chain rejections (an outsider, a second redemption, a redemption after expiry) were exercised only in the local fork simulation, not on public Sepolia.
+### Refusal on Sepolia
+
+Later the same day (22:52–22:53 UTC, 5:52–5:53 PM ET) a second run on public Sepolia, [`scripts/refusal.mjs`](partner/metamask/scripts/refusal.mjs), checked that payment is refused when it should be. Same throwaway accounts; two transactions, both deliberately reverting, sent with a fixed 400,000 gas limit so they would be mined (a gas estimate refuses a call that reverts). Before each send that run simulated the call with `eth_call` and refused to send if it would succeed; both simulations decoded to the expected reasons, and replaying each mined transaction at its parent block gives the same revert. The script's gate has since been tightened: it now sends only if the simulation reverts with the *expected* decoded reason (any RPC error or other reason aborts), and after mining it requires a `reverted` receipt and a matching parent-block replay, or it exits non-zero and writes nothing. A read-only `node scripts/refusal.mjs verify` re-checked both mined transactions with that code on 16 November 2026 (`independentReverification` in the record). The full record is in [`partner/metamask/live-refusal-result.json`](partner/metamask/live-refusal-result.json).
+
+| Step | Transaction | Block | Result |
+|---|---|---|---|
+| – The owner signs a fresh delegation (hash `0xa27cd9c3…340f`, one-hour expiry) whose salt binds it to a different case, `0xb773…c635`, where no MandateVerdict is deployed. The clerk's `settle()` checks it against the sample case, whose live verdict is TRUE | no transaction | – | refused by the clerk's code: `delegation salt does not match this GenLayer case`. Settling it against its own case sent nothing either (no readable verdict) |
+| R1. The agent [`0x8b5d…4929`](https://sepolia.etherscan.io/address/0x8b5deeE4A52c321C81C33b2bC99834EB05B04929) tries to redeem that fresh delegation itself, skipping the clerk | [`0x323887a0…`](https://sepolia.etherscan.io/tx/0x323887a077ab6f8be8226ab47f259f7a1b6562df2627db31f8ee5e592c33528b) | 12150397 | reverted: DelegationManager `InvalidDelegate` (only the delegation's delegate, the clerk, may redeem; this check runs before the `redeemer` caveat) |
+| R2. The clerk tries to redeem the delegation already paid in step C a second time | [`0x28c9837c…`](https://sepolia.etherscan.io/tx/0x28c9837c4137efd47ef85cac8940499cb792dfbc53b8860d9a41b3f92755d640) | 12150399 | reverted: `NativeTokenTransferAmountEnforcer:allowance-exceeded` (the 0.001 ETH cap is used; the `limitedCalls` count was already 1 and stayed 1) |
+
+The agent paid R1's gas (about 2.5 million wei) from the fee it had received; the clerk paid R2's. No ETH moved in either transaction, and the principal's smart account held 0 ETH throughout, so nothing could have been paid under the fresh delegation: R1 shows the delegate (caller) check, not a funded payment being blocked.
+
+**What is now live and what is still not.** An outsider redemption and a second redemption have reverted on public Sepolia. A live FALSE or UNDETERMINED verdict has not: the only deployed case resolved TRUE, and no new GenLayer transactions were made, so those paths, and a redemption after expiry, are still covered only by the unit tests and the local fork. The clerk refusal in this run is a case-label mismatch decided by the clerk's code, not by a contract.
 
 ## Architecture
 
@@ -116,7 +129,8 @@ The FALSE path and the on-chain rejections (an outsider, a second redemption, a 
 | `contracts/MandateVerdict.py` | The Intelligent Contract. Pinned to the Bradbury runner `py-genlayer:babwp9t37jw9g4j2bccgn14g6x7x9s1f7dsmh7emvz735pz4zxa0` and written against the current GenLayer Python API (`import genlayer as gl`, `gl.contract.Contract`, `gl.vm.run_nondet`). |
 | `examples/` | Sample mandate (with the bound evidence URL) and pass / fail / undetermined deliverables. |
 | `testnet-deploy/` | The demo page. By default it reads the live verdict of the deployed sample case without a wallet; an optional section deploys to Bradbury and runs one case, with every transaction signed in the browser with MetaMask. |
-| `partner/metamask/` | Verdict-gated MetaMask Smart Accounts Kit (ERC-7710) delegation: the code that builds the delegation and settles it, offline unit tests, a local Sepolia-fork simulation, and a live runner that only sends with `--broadcast`. |
+| `partner/metamask/` | Verdict-gated MetaMask Smart Accounts Kit (ERC-7710) delegation: the code that builds the delegation and settles it, offline unit tests, a local Sepolia-fork simulation, and live payment and refusal runners that only send with `--broadcast`. |
+| `SKILL.md` | Reusable agent skill: the whole flow with the repository's own commands, addresses, decision table and trust model. |
 | `tests/direct/` | Optional in-memory tests of the contract file via `genlayer-test`. |
 | `proof/` | Dated raw JSON-RPC receipts for the sample Bradbury run, with commands to reproduce. Also copied into the page build for its fallback view. |
 | `.github/workflows/pages.yml` | On push to `main`: `npm ci`, `npm test`, `npm run build` in `testnet-deploy/`, then publishes `testnet-deploy/dist` to GitHub Pages. Uses only the built-in `GITHUB_TOKEN`. |
@@ -162,9 +176,10 @@ MetaMask delegation (Node 20+). The unit tests are network-free. The simulation 
 ```bash
 cd partner/metamask
 npm ci
-npm test          # delegation shape, caveats, salt label, expiry read from the signed caveat, signature recovery, settle() decisions
+npm test          # delegation shape, caveats, salt label, expiry, signature recovery, settle() decisions, both recorded live runs
 npm run simulate  # local anvil fork of Sepolia: deploy, fund, sign, read the live verdict, redeem
 npm run plan      # prints the three public-testnet transactions a live run would send
+node scripts/refusal.mjs plan   # prints the refusal run's steps (two deliberately reverting redemptions)
 ```
 
 Optional contract tests (Python 3.11+). These use a local GenVM stand-in, not the live network:
@@ -206,6 +221,7 @@ Each transaction sends a fee deposit as `value`; unused budget is refunded at fi
 ## Limitations
 
 - **One case per contract.** A registry of many mandates would be a later revision.
+- **Live refusals are on-chain limits, not the verdict.** The outsider's and the repeat redemption that reverted on Sepolia show MetaMask's limits holding (only the clerk, only once). They do not show a live FALSE verdict, which has not occurred on this project's only deployed case.
 - **The settlement clerk is trusted.** `partner/metamask/` gates the MetaMask delegation on the verdict in off-chain code. MetaMask's caveat enforcers limit what the clerk can do (exact fee, to the named agent, once, before expiry), but no contract checks the GenLayer verdict or the case label (salt) on Sepolia, and the fee is not locked: it stays in the principal's own account until redemption. A trustless version would need an oracle or a bridge that carries the verdict to the EVM chain, plus a caveat enforcer that reads it.
 - **Local tests use a v0.3-dev stand-in.** `tests/direct` runs the contract in genlayer-test's in-memory VM with mocked web and model responses. That environment is a v0.3-dev stand-in, not the exact Bradbury runner pinned in the contract header, and it is not a network consensus run. The on-chain proof above is the authoritative result.
 - **Submitted-URL binding is not the fetched page.** GenVM follows redirects and does not expose the final URL, so a bound URL can still lead the jury to a page the agent controls if that page is the redirect target. With prefix binding, the agent can also submit any path under the allowed prefix, including a page it controls there. See [Evidence-URL policy](#evidence-url-policy).
