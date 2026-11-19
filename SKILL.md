@@ -28,7 +28,7 @@ https://pz-human-owner.github.io/internet-court-mandate-demo/
 
 | What | Where | Value |
 |---|---|---|
-| MandateVerdict sample case (verdict `TRUE`) | GenLayer Testnet Bradbury, chain 4221 | [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B) |
+| MandateVerdict sample case (verdict `TRUE`) | GenLayer Testnet Bradbury, chain 4221 | [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.bradbury.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B) |
 | GenLayer node RPC (`gen_call`, receipts) | Bradbury | `https://rpc-bradbury.genlayer.com` |
 | GenLayer chain RPC (wallet, `eth_*`) | Bradbury | `https://rpc.testnet-chain.genlayer.com` |
 | DelegationManager (MetaMask's own deployment) | Ethereum Sepolia, chain 11155111 | `0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3` |
@@ -38,7 +38,48 @@ https://pz-human-owner.github.io/internet-court-mandate-demo/
 | `VerdictGateEnforcer` (on-chain verdict gate caveat; source verified on [Sourcify](https://repo.sourcify.dev/11155111/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a)) | Sepolia | [`0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a`](https://sepolia.etherscan.io/address/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a) |
 | On-chain check run: blocked before the verdict was posted, paid after | Sepolia | [`partner/metamask/live-onchain-check-result.json`](partner/metamask/live-onchain-check-result.json) |
 | Raw Bradbury receipts for the case | Bradbury | [`proof/`](proof/) |
-| Live FALSE case (`request_verdict` [`0x4b2b38cd…`](https://explorer-bradbury.genlayer.com/tx/0x4b2b38cd79433d25fde027dcf6de853f0a6339d3d170b9131abe0a13565e7127)) and its read-only Sepolia refusal check | Bradbury + Sepolia | [`0x51a2343c90192360199553B92C0D9Fe976D77662`](https://scan.testnet-chain.genlayer.com/address/0x51a2343c90192360199553B92C0D9Fe976D77662), [`partner/metamask/live-false-check-result.json`](partner/metamask/live-false-check-result.json) |
+| Live FALSE case (`request_verdict` [`0x4b2b38cd…`](https://explorer-bradbury.genlayer.com/tx/0x4b2b38cd79433d25fde027dcf6de853f0a6339d3d170b9131abe0a13565e7127)) and its read-only Sepolia refusal check | Bradbury + Sepolia | [`0x51a2343c90192360199553B92C0D9Fe976D77662`](https://scan.bradbury.genlayer.com/address/0x51a2343c90192360199553B92C0D9Fe976D77662), [`partner/metamask/live-false-check-result.json`](partner/metamask/live-false-check-result.json) |
+
+## Connector summary (Internet Court `genlayer-erc7710-connector` shape)
+
+This section answers the eight items of the [GenLayer ERC-7710 Connector](https://github.com/internet-court/internet-court-skill/tree/main/integrations/genlayer-erc7710-connector) skill's output checklist, so the design can be compared with other Internet Court connectors line by line. It describes what is deployed and recorded now; nothing here is a new claim.
+
+**Design rule.** GenLayer produces a decision; an EVM-side caveat enforcer consumes it. The effect path is spelled out below. GenLayer does not itself move or block the Sepolia payment.
+
+1. **Connector mode and trust assumptions.** Two modes are shown:
+   - *Manual demo relay* (steps 1-5): the clerk reads `get_verdict()` and redeems only on a resolved `TRUE`. The clerk is trusted to relay correctly.
+   - *Trusted relayer* (step 6): a carrier named in the signed delegation reads the finalized `TRUE` and calls `postVerdictTrue` on `VerdictGateEnforcer`. The carrier is a trusted off-chain writer: on-chain rules limit *which* delegation it can unlock (this case, this carrier, once), not whether it is honest. No contract on Sepolia checks GenLayer itself.
+   - Not used: Studio bridge, optimistic relay, verified bridge, direct EVM call.
+2. **GenLayer decision source.** `MandateVerdict` (`contracts/MandateVerdict.py`) on GenLayer Testnet Bradbury (chain 4221). Methods: `request_verdict()` writes; `get_verdict()` / `get_status()` read. The decision enum is `TRUE` / `FALSE` / `UNDETERMINED` with `status` `open` / `submitted` / `resolved`. The decision is checked on the `request_verdict` receipt: `Finalized`, `FinishedWithReturn`, and the round result.
+3. **Decision payload.** This demo does not use the full `GenLayerDelegationDecision` struct. The EVM side receives only a case key: `caseKey = keccak256(abi.encodePacked("internet-court-mandate-verdict", genlayerChainId, caseContract))`. That key is also the delegation salt. The carrier posts it with `postVerdictTrue(genlayerChainId, caseContract)`. Score, violations hash, evidence hash, `issuedAt` and `expiresAt` are not carried. Expiry is enforced by the delegation's own timestamp caveat.
+4. **Relay, proof and finality path.** The carrier waits for `request_verdict` to be `Finalized` with `get_verdict().verdict == "TRUE"`, then sends one Sepolia transaction. There is no proof: Sepolia trusts the carrier's address, which the principal named in the signed terms.
+5. **EVM controller interface.** `VerdictGateEnforcer` (`partner/metamask/contracts/src/VerdictGateEnforcer.sol`, [Sepolia `0xfEf9…074a`](https://sepolia.etherscan.io/address/0xfEf947Be0F73A95D2A29f156D5cDfC2692Da074a), Sourcify-verified):
+   - `postVerdictTrue(genlayerChainId, caseContract)` records `verdictTrue[msg.sender][caseKey]`;
+   - `caseKey(...)` is a pure view;
+   - `beforeHook` requires `verdictTrue[carrier][key]`.
+   There is no revoke or constrain method: the only effect is "unlock payment on TRUE".
+6. **Where ERC-7710 redemption checks the controller.** As a caveat enforcer. MetaMask's `DelegationManager.redeemDelegations` calls `beforeHook` with the caveat terms `abi.encode(caseKey, carrier)`. Alongside it are MetaMask's stock caveats: exact payment, redeemer, one call, and a timestamp expiry.
+7. **Decision-to-effect mapping.**
+   - `TRUE` (finalized): the carrier posts; the agent can redeem once.
+   - `FALSE` or `UNDETERMINED`: nothing is posted; every redemption reverts `verdict-not-true`; the delegation lapses at expiry.
+   - Not resolved: same as `FALSE`.
+   - The principal can always disable the delegation with MetaMask's own `disableDelegation`.
+8. **Failure cases and tests.**
+
+   | Failure case | Result | Evidence |
+   |---|---|---|
+   | Redeem before a verdict | Reverts | Live Sepolia T3 |
+   | A different case's TRUE | Refused | Salt binding: unit test, and a break-it row |
+   | A different carrier's TRUE | Refused | Unit test, and a break-it row |
+   | Outsider redeem | Reverted | Live |
+   | Second redemption | Reverted | Live |
+   | FALSE case | Refused | Live Bradbury verdict; Sepolia refusal by `eth_call` simulation |
+   | Duplicate post | Reverts `already-posted` | Foundry test |
+   | Stale or expired delegation | Refused | Timestamp caveat: unit test |
+   | Carrier outage | Fails closed: no payment | — |
+   | Dishonest carrier | **Not mitigated** | — |
+
+   The dishonest carrier is the main open item. A direct-call mode, where the Intelligent Contract posts to an enforcer on GenLayer Chain itself on finalization, would remove it and is being prototyped separately.
 
 ## Setup
 

@@ -11,6 +11,8 @@ export const BRADBURY = Object.freeze({
   // EVM chain RPC (docs). MetaMask uses this one for eth_* and signing.
   chainRpcUrl: 'https://rpc.testnet-chain.genlayer.com',
   explorerUrl: 'https://scan.testnet-chain.genlayer.com',
+  // GenLayer Explorer contract pages (the portal's named "GenLayer Explorer Contract" evidence type).
+  contractExplorerUrl: 'https://scan.bradbury.genlayer.com',
   // Block-zero hash and AddressManager the docs say to verify before sending.
   genesisHash: '0x17d89764d4f4f963158fc4c5e8f2cb670c2837740b35f37081c12860c3df97e4',
   addressManager: '0x3F71AE080BD6270A91dBcc7960d88797828538E0',
@@ -144,7 +146,7 @@ export function shouldUnlockAfterEstimate(alreadyEstimated) {
 }
 
 export function explorerTx(hash, net = BRADBURY) { return `${net.explorerUrl}/tx/${hash}`; }
-export function explorerAddress(addr, net = BRADBURY) { return `${net.explorerUrl}/address/${addr}`; }
+export function explorerAddress(addr, net = BRADBURY) { return `${net.contractExplorerUrl || net.explorerUrl}/address/${addr}`; }
 
 // ---------------------------------------------------------------------------
 // Read-only live view (no wallet). The page reads the already-deployed sample
