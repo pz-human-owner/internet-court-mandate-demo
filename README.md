@@ -72,6 +72,17 @@ These rules are in `contracts/MandateVerdict.py` (`_normalize_ws`, `_quote_in_pa
 
 ## MetaMask delegation settlement
 
+### Direct mode (no carrier, no relayer key)
+
+The upgrade in this branch removes the trusted carrier. `contracts/MandateVerdictDirect.py` is the same jury as `MandateVerdict.py`, plus one constructor argument: the address of `VerdictGateDirectEnforcer` on GenLayer Chain (Bradbury's EVM layer, chain id 4221). When a verdict resolves **TRUE**, the Intelligent Contract itself emits `postVerdictTrue()` as an external message. GenLayer delivers that message only after the transaction is finalized, from the contract's ghost, whose address equals the contract's address. The enforcer records `verdictTrue[msg.sender] = true`, so only that case can open its own slot. **FALSE** and **UNDETERMINED** emit nothing (deny by default). There is no owner, no carrier key, and no relayer.
+
+Local proof (nothing broadcast):
+
+- `tests/direct/test_mandate_verdict_direct.py` — in-memory GenVM: TRUE emits `postVerdictTrue()` once; FALSE, UNDETERMINED and fetch errors emit nothing; a zero gate address is rejected.
+- `partner/genlayer-chain` Foundry tests, against MetaMask Delegation Framework v1.3.0 unmodified (submodule tag `v1.3.0`): early redeem reverts; TRUE pays the agent once; FALSE never posts, so redeem reverts; a stranger EOA or a non-ghost contract cannot post; another case cannot open this case's slot; a duplicate post is idempotent; expiry and `disableDelegation` still apply.
+
+A live Bradbury / GenLayer Chain batch (gate, TRUE and FALSE cases, signed delegations, mined revert on FALSE) has not been sent yet. The recorded Sepolia carrier path below is the currently deployed v1.3 demo.
+
 [`partner/metamask/`](partner/metamask/) turns the verdict into a payment decision with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/) (`@metamask/smart-accounts-kit` 2.0.0, [delegation guide](https://docs.metamask.io/smart-accounts-kit/guides/delegation/execute-on-smart-accounts-behalf/)).
 
 1. **Fund.** The principal has a MetaMask Hybrid smart account on Ethereum Sepolia holding the agent's fee (0.001 ETH in the demo). This is not an escrow: the fee stays in the principal's own account, and the owner could move it out before redemption, in which case the redemption reverts and the agent is not paid.
@@ -274,16 +285,24 @@ node scripts/onchain-check.mjs verify   # read-only re-check of the recorded on-
 
 `npm test` includes a test that starts a plain local `anvil` (no fork) if it is on `PATH`, and skips it otherwise. CI installs Foundry v1.9.0.
 
-Optional contract tests (Python 3.11+). These use a local GenVM stand-in, not the live network:
+Optional contract tests (Python 3.11+). These use a local GenVM stand-in, not the live network. `genlayer-test` 0.29.2 needs the small allocator shim in `tests/direct/conftest.py` for this contract's pinned runner:
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 python -m pytest tests/direct -q
 genvm-lint check contracts/MandateVerdict.py
+genvm-lint check contracts/MandateVerdictDirect.py
 ```
 
 Without `genlayer-test` installed, `tests/direct` is skipped.
+
+Direct-mode enforcer and Delegation Framework tests (Foundry; local EVM only):
+
+```bash
+cd partner/genlayer-chain
+forge test
+```
 
 ## Deploy on Bradbury
 

@@ -1,6 +1,6 @@
 ---
 name: internet-court-verdict-gated-payment
-description: Pay an AI agent through a MetaMask ERC-7710 delegation only after a GenLayer Internet Court jury rules its deliverable TRUE. Use when you want to read a MandateVerdict case on GenLayer Testnet Bradbury, deploy your own case, or build, sign and redeem a verdict-gated MetaMask Smart Accounts Kit delegation on Ethereum Sepolia, including the refusal paths and an on-chain verdict gate (a custom caveat enforcer whose verdict is posted by a named, trusted carrier).
+description: Pay an AI agent through a MetaMask ERC-7710 delegation only after a GenLayer Internet Court jury rules its deliverable TRUE. Use when you want to read a MandateVerdict case on GenLayer Testnet Bradbury, deploy your own case, or build, sign and redeem a verdict-gated MetaMask Smart Accounts Kit delegation on Ethereum Sepolia, including the refusal paths, the recorded trusted-carrier gate on Sepolia, and direct mode on GenLayer Chain (the Intelligent Contract posts TRUE itself; no carrier key).
 ---
 
 # Internet Court verdict → MetaMask payment
@@ -301,16 +301,21 @@ The agent pays the gas for its two redemptions, so the agent address needs a lit
   check is stored under `independentReverification` in the refusal record. The default public RPC refuses
   parent-block (archive) calls, and the script then fails instead of passing.
 
+## Direct mode (no carrier)
+
+`contracts/MandateVerdictDirect.py` plus `partner/genlayer-chain/src/VerdictGateDirectEnforcer.sol` are the carrier-free path. Deploy the enforcer on GenLayer Chain (4221) with the runtime code hash shared by GenLayer ghost contracts. Deploy a MandateVerdictDirect case with that gate address. On a finalized **TRUE**, the case emits `postVerdictTrue()`; `msg.sender` is the case itself. Sign a MetaMask delegation whose verdict-gate caveat terms are `abi.encode(caseAddress)`, and let the agent redeem itself after the post. FALSE and UNDETERMINED never post, so redemption stays locked. This path has local GenVM and Foundry tests; a live Bradbury batch has not been sent yet. The Sepolia carrier instructions above still describe the recorded v1.3 demo.
+
 ## Trust model and limits
 
 - **The clerk is trusted for the verdict (steps 3–5).** Nothing on Sepolia checks GenLayer. The verdict check and the
   case match run in the clerk's code; a dishonest clerk could redeem on `FALSE`. It still could not pay anyone else, pay
   more, pay twice, or pay after expiry.
-- **The carrier is trusted for the verdict (step 6).** With `VerdictGateEnforcer` the gate and the case match are checked
+- **The carrier is trusted for the verdict (step 6, Sepolia path).** With `VerdictGateEnforcer` the gate and the case match are checked
   on-chain, but whether the GenLayer verdict really is `TRUE` rests on the carrier named in the signed delegation. It is a
   trusted off-chain writer. A posted TRUE cannot be undone (the principal can only
   `disableDelegation` or let it expire), and one post opens every delegation naming that carrier and case. In the
   recorded run the carrier was the clerk's throwaway key, and one operator held every key.
+  **Direct mode removes this trust:** the case contract posts to `VerdictGateDirectEnforcer` itself after finalization, and each case can only write its own slot. That path is implemented and tested locally; it is not yet live on Bradbury.
 - **Not an escrow.** The fee stays in the principal's smart account until redemption; the owner can move it out first.
 - **Live coverage.** On Sepolia: one paid redemption, plus an outsider's redemption and a repeat redemption that both reverted, plus a gated redemption that was blocked before the verdict was posted and paid after. A live `FALSE` or `UNDETERMINED` verdict
   and an expired redemption are covered by the unit tests and the local fork, not on a public chain.
