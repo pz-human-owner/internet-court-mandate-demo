@@ -20,3 +20,9 @@ dist/
 
 # OS
 .DS_Store
+
+# Direct-mode live proof: local state only. The throwaway key lives outside this repo
+# (default /workspace/v6work/submission-101/.throwaway.key) and must never be committed.
+direct-proof-state.json
+.throwaway.key
+*.key

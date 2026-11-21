@@ -12,7 +12,7 @@ These receipts do not replace the explorer; they are a dated snapshot of the sam
 | `submit_deliverable` | `0x778a69fe0b8ffb3e7a80879cef6ea25aa65bee4cd9992a7b3cbbfba61350a9e7` | `0xe8df70a207b432c69102d889817fa70a566916dba8aa0630b1935aad2712d3e5` | [`eth/submit_deliverable.json`](eth/submit_deliverable.json), [`gen/submit_deliverable.json`](gen/submit_deliverable.json) |
 | `request_verdict` | `0x99f86115017d036dc1d2119ada7c8875cc79c5ef9532d705b9a352d764632e49` | `0xe6b05c9f31f84392c0bac5d94cb8df1f107634f61bd3ba0ce8c056710e1517d8` | [`eth/request_verdict.json`](eth/request_verdict.json), [`gen/request_verdict.json`](gen/request_verdict.json) |
 
-Contract: [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B). Explorer: [scan.testnet-chain.genlayer.com](https://scan.testnet-chain.genlayer.com).
+Contract: [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.bradbury.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B). Explorer: [scan.testnet-chain.genlayer.com](https://scan.testnet-chain.genlayer.com).
 
 The GenLayer transaction id is not the EVM hash. It appears as a repeated 32-byte topic in that transaction's EVM logs. `gen_getTransactionReceipt` on the EVM hash returns an uninitialized receipt; pass the GenLayer id as shown below.
 

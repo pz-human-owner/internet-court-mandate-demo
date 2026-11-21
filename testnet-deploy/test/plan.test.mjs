@@ -83,7 +83,7 @@ test('send confirm text shows the live deposit; re-estimate does not unlock agai
 test('default contract is the deployed Bradbury sample case', () => {
   assert.equal(DEFAULT_CONTRACT, '0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B');
   assert.ok(isAddress(DEFAULT_CONTRACT));
-  assert.equal(explorerAddress(DEFAULT_CONTRACT), 'https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B');
+  assert.equal(explorerAddress(DEFAULT_CONTRACT), 'https://scan.bradbury.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B');
   assert.deepEqual([...VIEW_FUNCTIONS], ['get_status', 'get_verdict', 'get_case']);
   assert.equal(RECORDED_RUN.contract, DEFAULT_CONTRACT);
 });

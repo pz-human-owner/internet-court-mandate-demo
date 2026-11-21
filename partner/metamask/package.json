@@ -11,7 +11,11 @@
     "plan": "node scripts/live.mjs plan",
     "test:contracts": "cd contracts && forge test && cd .. && node scripts/export-enforcer-artifact.mjs --check",
     "onchain:plan": "node scripts/onchain-check.mjs plan",
-    "onchain:verify": "node scripts/onchain-check.mjs verify"
+    "onchain:verify": "node scripts/onchain-check.mjs verify",
+    "direct-proof": "npm --prefix ../genlayer-chain run plan --",
+    "direct-proof:plan": "npm --prefix ../genlayer-chain run plan",
+    "direct-proof:test": "npm --prefix ../genlayer-chain test",
+    "direct-proof:dry-run": "npm --prefix ../genlayer-chain run dry-run"
   },
   "dependencies": {
     "@metamask/delegation-abis": "2.0.0",

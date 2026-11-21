@@ -1,8 +1,16 @@
 # Internet Court Mandate Demo
 
+<p>
+  <a href="https://internetcourt.org/"><img src="https://github.com/internet-court.png?size=96" alt="Internet Court" height="48"></a>&nbsp;&nbsp;
+  <a href="https://www.genlayer.com/"><img src="https://github.com/genlayerlabs.png?size=96" alt="GenLayer" height="48"></a>&nbsp;&nbsp;
+  <a href="https://metamask.io/"><img src="https://github.com/MetaMask.png?size=96" alt="MetaMask" height="48"></a>
+</p>
+
+<sub>Logos: Internet Court, GenLayer and MetaMask (each organization's official GitHub avatar), shown to name the projects this demo uses. This project is not endorsed by any of them.</sub>
+
 **Live demo (no wallet needed):** https://pz-human-owner.github.io/internet-court-mandate-demo/  
 **Demo video (44 s):** [mission101_demo_v5.mp4](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/download/v1.3-demo/mission101_demo_v5.mp4) on the [v1.3-demo release](https://github.com/pz-human-owner/internet-court-mandate-demo/releases/tag/v1.3-demo)  
-**Reuse it:** [`SKILL.md`](SKILL.md), an agent skill that walks through reading a verdict, opening a case, and building, settling and refusing the MetaMask delegation
+**Reuse it:** [`SKILL.md`](SKILL.md), an agent skill that walks through reading a verdict, opening a case, and building, settling and refusing the MetaMask delegation. Its [connector summary](SKILL.md#connector-summary-internet-court-genlayer-erc7710-connector-shape) answers Internet Court's `genlayer-erc7710-connector` checklist item by item
 
 A principal writes a mandate, binds the evidence a jury may read, and appoints an agent. The agent submits a deliverable. A [GenLayer](https://docs.genlayer.com/) Intelligent Contract then acts as an [Internet Court](https://internetcourt.org/)-style jury: validators fetch a page at the submitted source URL and record whether the deliverable met the mandate.
 
@@ -14,7 +22,7 @@ The sample case binds official [MetaMask Smart Accounts Kit: Delegation](https:/
 
 Hosted page: **https://pz-human-owner.github.io/internet-court-mandate-demo/** (served by GitHub Pages from `testnet-deploy/` via [`.github/workflows/pages.yml`](.github/workflows/pages.yml) on every push to `main`).
 
-- **View the live verdict (default, no wallet).** On load the page reads the deployed sample case, contract [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B) on Bradbury, with read-only `gen_call` views (`get_status`, `get_verdict`, `get_case`) and shows the mandate, deliverable, verdict, reasoning, supporting quote, and explorer links. Nothing is signed or sent. If the RPC cannot be reached, the page says so and shows the recorded result of the Nov 15 run with links to the [`proof/`](proof/) receipts and the explorer. Add `?contract=0x…` to read a different MandateVerdict contract. The MetaMask section uses that link to resume at the next unsent step, chosen from a read-only `get_status` call.
+- **View the live verdict (default, no wallet).** On load the page reads the deployed sample case, contract [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.bradbury.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B) on Bradbury, with read-only `gen_call` views (`get_status`, `get_verdict`, `get_case`) and shows the mandate, deliverable, verdict, reasoning, supporting quote, and explorer links. Nothing is signed or sent. If the RPC cannot be reached, the page says so and shows the recorded result of the Nov 15 run with links to the [`proof/`](proof/) receipts and the explorer. Add `?contract=0x…` to read a different MandateVerdict contract. The MetaMask section uses that link to resume at the next unsent step, chosen from a read-only `get_status` call.
 - **Try to break it (no wallet).** On load the page runs eight read-only checks against Ethereum Sepolia and Bradbury ([`testnet-deploy/src/breakit.mjs`](testnet-deploy/src/breakit.mjs)): redeem before any TRUE is posted, fund the account but post no verdict, TRUE posted for a different case, TRUE posted by someone other than the named carrier, a stranger redeeming, a second redemption after payment, a control that does go through, and the live FALSE case. Each is an `eth_call` simulation (some pinned to a past block or with a state override) or a `gen_call` read, using the agent's own mined redemption calldata; nothing is signed or sent. A failed RPC shows "Could not check", never a pass. These checks show what the on-chain limits refuse; they do not show that the carrier, a trusted off-chain writer, is honest.
 - **Try it with MetaMask (optional).** A collapsed section deploys your own copy from your own MetaMask wallet. It sends real Bradbury testnet transactions and needs testnet GEN; see [Deploy on Bradbury](#deploy-on-bradbury).
 
@@ -64,6 +72,20 @@ These rules are in `contracts/MandateVerdict.py` (`_normalize_ws`, `_quote_in_pa
 
 ## MetaMask delegation settlement
 
+### Direct mode (no carrier, no relayer key)
+
+The upgrade in this branch removes the trusted carrier. `contracts/MandateVerdictDirect.py` is the same jury as `MandateVerdict.py`, plus one constructor argument: the address of `VerdictGateDirectEnforcer` on GenLayer Chain (Bradbury's EVM layer, chain id 4221). When a verdict resolves **TRUE**, the Intelligent Contract itself emits `postVerdictTrue()` as an external message. GenLayer delivers that message only after the transaction is finalized, from the contract's ghost, whose address equals the contract's address. The enforcer records `verdictTrue[msg.sender] = true`, so only that case can open its own slot. **FALSE** and **UNDETERMINED** emit nothing (deny by default). There is no owner, no carrier key, and no relayer.
+
+Local proof (nothing broadcast):
+
+- `tests/direct/test_mandate_verdict_direct.py` — in-memory GenVM: TRUE emits `postVerdictTrue()` once; FALSE, UNDETERMINED and fetch errors emit nothing; a zero gate address is rejected.
+- `partner/genlayer-chain` Foundry tests, against MetaMask Delegation Framework v1.3.0 unmodified (submodule tag `v1.3.0`): early redeem reverts; TRUE pays the agent once; FALSE never posts, so redeem reverts; a stranger EOA or a non-ghost contract cannot post; another case cannot open this case's slot; a duplicate post is idempotent; expiry and `disableDelegation` still apply.
+
+A live Bradbury / GenLayer Chain batch (gate, TRUE and FALSE cases, signed delegations, mined revert on FALSE) has not been sent yet. The recorded Sepolia carrier path below is the currently deployed v1.3 demo.
+
+The runner is [`partner/genlayer-chain/scripts/direct-proof.mjs`](partner/genlayer-chain/scripts/direct-proof.mjs). `plan` prints the batch and a GEN estimate (no key, no writes). `dry-run` exercises the EVM path on a local anvil fork of chain 4221. `broadcast --broadcast` is the live send; it is refused until a funded throwaway EOA key file is present. MetaMask Delegation Framework v1.3.0 is reused at the official CREATE2 addresses already on 4221. See [`partner/genlayer-chain/README.md`](partner/genlayer-chain/README.md).
+
+
 [`partner/metamask/`](partner/metamask/) turns the verdict into a payment decision with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/) (`@metamask/smart-accounts-kit` 2.0.0, [delegation guide](https://docs.metamask.io/smart-accounts-kit/guides/delegation/execute-on-smart-accounts-behalf/)).
 
 1. **Fund.** The principal has a MetaMask Hybrid smart account on Ethereum Sepolia holding the agent's fee (0.001 ETH in the demo). This is not an escrow: the fee stays in the principal's own account, and the owner could move it out before redemption, in which case the redemption reverts and the agent is not paid.
@@ -102,7 +124,7 @@ The recorded output is in [`partner/metamask/sim-result.json`](partner/metamask/
 
 ### Live run on Sepolia
 
-On 16 November 2026 (20:38–20:39 UTC) the flow ran on public Ethereum Sepolia with throwaway testnet keys. The clerk read the real Bradbury verdict for [`0x07E2…2F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B), got `resolved` / **TRUE**, and redeemed the delegation. All keys were throwaway testnet keys, and the same operator held both the OWNER and CLERK keys (in this run the agent was only a receiving address; the refusal run below also used its throwaway key). To keep the demo to one funded account, the clerk paid the gas for all three transactions and also sent the 0.001 ETH fee into the principal's smart account (step B). In real use the principal would fund their own account. The full record, with hashes, blocks, addresses, the delegation hash, caveat enforcers and a raw `get_verdict` response (from a read-only call made after the run), is in [`partner/metamask/live-result.json`](partner/metamask/live-result.json).
+On 16 November 2026 (20:38–20:39 UTC) the flow ran on public Ethereum Sepolia with throwaway testnet keys. The clerk read the real Bradbury verdict for [`0x07E2…2F8B`](https://scan.bradbury.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B), got `resolved` / **TRUE**, and redeemed the delegation. All keys were throwaway testnet keys, and the same operator held both the OWNER and CLERK keys (in this run the agent was only a receiving address; the refusal run below also used its throwaway key). To keep the demo to one funded account, the clerk paid the gas for all three transactions and also sent the 0.001 ETH fee into the principal's smart account (step B). In real use the principal would fund their own account. The full record, with hashes, blocks, addresses, the delegation hash, caveat enforcers and a raw `get_verdict` response (from a read-only call made after the run), is in [`partner/metamask/live-result.json`](partner/metamask/live-result.json).
 
 | Step | Transaction | Block | Result |
 |---|---|---|---|
@@ -183,7 +205,7 @@ Still not shown:
 - verification on Etherscan's own verifier, which needs an account (Sourcify only).
 
 ### Live FALSE verdict on Bradbury
-On 16 November 2026, about 9:56 PM ET (02:56 UTC on 17 November), a second case ran on GenLayer Testnet Bradbury and resolved **FALSE**. The case contract is [`0x51a2343c90192360199553B92C0D9Fe976D77662`](https://scan.testnet-chain.genlayer.com/address/0x51a2343c90192360199553B92C0D9Fe976D77662). Its deliverable said the delegate holds the delegator's private key and that scope and caveats are only suggestions. The jury quoted [MetaMask's delegation overview](https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/): "The delegator creates a delegation, configuring a scope and optional caveats that define the conditions under which the delegation can be redeemed."
+On 16 November 2026, about 9:56 PM ET (02:56 UTC on 17 November), a second case ran on GenLayer Testnet Bradbury and resolved **FALSE**. The case contract is [`0x51a2343c90192360199553B92C0D9Fe976D77662`](https://scan.bradbury.genlayer.com/address/0x51a2343c90192360199553B92C0D9Fe976D77662). Its deliverable said the delegate holds the delegator's private key and that scope and caveats are only suggestions. The jury quoted [MetaMask's delegation overview](https://docs.metamask.io/smart-accounts-kit/concepts/delegation/overview/): "The delegator creates a delegation, configuring a scope and optional caveats that define the conditions under which the delegation can be redeemed."
 
 | Step | GenLayer transaction | EVM hash | Result |
 |---|---|---|---|
@@ -230,7 +252,7 @@ Independent verification:
 
 | Step | Value |
 |---|---|
-| Contract | [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.testnet-chain.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B) |
+| Contract | [`0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B`](https://scan.bradbury.genlayer.com/address/0x07E2A9e0341266E87e539E8a18B9Ed2611612F8B) |
 | Deploy (EVM transaction) | [`0x5572f1d3140aa180df8dbe5df207ba1f9cbdff26c86651086b3e72b636509d09`](https://scan.testnet-chain.genlayer.com/tx/0x5572f1d3140aa180df8dbe5df207ba1f9cbdff26c86651086b3e72b636509d09) |
 | `submit_deliverable` (EVM transaction) | [`0x778a69fe0b8ffb3e7a80879cef6ea25aa65bee4cd9992a7b3cbbfba61350a9e7`](https://scan.testnet-chain.genlayer.com/tx/0x778a69fe0b8ffb3e7a80879cef6ea25aa65bee4cd9992a7b3cbbfba61350a9e7) |
 | `request_verdict` (EVM transaction) | [`0x99f86115017d036dc1d2119ada7c8875cc79c5ef9532d705b9a352d764632e49`](https://scan.testnet-chain.genlayer.com/tx/0x99f86115017d036dc1d2119ada7c8875cc79c5ef9532d705b9a352d764632e49) |
@@ -266,16 +288,34 @@ node scripts/onchain-check.mjs verify   # read-only re-check of the recorded on-
 
 `npm test` includes a test that starts a plain local `anvil` (no fork) if it is on `PATH`, and skips it otherwise. CI installs Foundry v1.9.0.
 
-Optional contract tests (Python 3.11+). These use a local GenVM stand-in, not the live network:
+Optional contract tests (Python 3.11+). These use a local GenVM stand-in, not the live network. `genlayer-test` 0.29.2 needs the small allocator shim in `tests/direct/conftest.py` for this contract's pinned runner:
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 python -m pytest tests/direct -q
 genvm-lint check contracts/MandateVerdict.py
+genvm-lint check contracts/MandateVerdictDirect.py
 ```
 
 Without `genlayer-test` installed, `tests/direct` is skipped.
+
+Direct-mode enforcer and Delegation Framework tests (Foundry; local EVM only):
+
+```bash
+cd partner/genlayer-chain
+forge test
+```
+
+The direct-mode live runner (network-free unit tests; `plan` / `dry-run` send nothing to Bradbury):
+
+```bash
+cd partner/genlayer-chain
+npm ci
+npm test
+npm run plan
+npm run dry-run       # local anvil fork of chain 4221; needs Foundry's anvil
+```
 
 ## Deploy on Bradbury
 
