@@ -83,6 +83,9 @@ Local proof (nothing broadcast):
 
 A live Bradbury / GenLayer Chain batch (gate, TRUE and FALSE cases, signed delegations, mined revert on FALSE) has not been sent yet. The recorded Sepolia carrier path below is the currently deployed v1.3 demo.
 
+The runner is [`partner/genlayer-chain/scripts/direct-proof.mjs`](partner/genlayer-chain/scripts/direct-proof.mjs). `plan` prints the batch and a GEN estimate (no key, no writes). `dry-run` exercises the EVM path on a local anvil fork of chain 4221. `broadcast --broadcast` is the live send; it is refused until a funded throwaway EOA key file is present. MetaMask Delegation Framework v1.3.0 is reused at the official CREATE2 addresses already on 4221. See [`partner/genlayer-chain/README.md`](partner/genlayer-chain/README.md).
+
+
 [`partner/metamask/`](partner/metamask/) turns the verdict into a payment decision with the [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/) (`@metamask/smart-accounts-kit` 2.0.0, [delegation guide](https://docs.metamask.io/smart-accounts-kit/guides/delegation/execute-on-smart-accounts-behalf/)).
 
 1. **Fund.** The principal has a MetaMask Hybrid smart account on Ethereum Sepolia holding the agent's fee (0.001 ETH in the demo). This is not an escrow: the fee stays in the principal's own account, and the owner could move it out before redemption, in which case the redemption reverts and the agent is not paid.
@@ -302,6 +305,16 @@ Direct-mode enforcer and Delegation Framework tests (Foundry; local EVM only):
 ```bash
 cd partner/genlayer-chain
 forge test
+```
+
+The direct-mode live runner (network-free unit tests; `plan` / `dry-run` send nothing to Bradbury):
+
+```bash
+cd partner/genlayer-chain
+npm ci
+npm test
+npm run plan
+npm run dry-run       # local anvil fork of chain 4221; needs Foundry's anvil
 ```
 
 ## Deploy on Bradbury
